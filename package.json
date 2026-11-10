@@ -1,0 +1,24 @@
+{
+  "name": "ksa-outpost-86",
+  "private": true,
+  "version": "1.0.0",
+  "description": "KSA OUTPOST 86 \u2014 Build. Survive. Explore. A browser-based lunar outpost training mission.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "build": "npm run typecheck && npm test && vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "playcanvas": "2.24.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "7.2.2"
+  },
+  "engines": {
+    "node": ">=22.16.0"
+  }
+}
