@@ -2,12 +2,18 @@
   "name": "KSA OUTPOST 86",
   "short_name": "OUTPOST 86",
   "description": "Build. Survive. Explore. A student lunar outpost training mission.",
-  "start_url": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#08111e",
   "theme_color": "#08111e",
   "orientation": "any",
   "icons": [
-    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
   ]
 }

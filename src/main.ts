@@ -202,7 +202,7 @@ async function boot(): Promise<void> {
   window.addEventListener('pagehide', saveMissionToDevice);
 
   if ('serviceWorker' in navigator && import.meta.env.PROD) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL }).catch(() => {
       // The game remains usable if PWA caching is unavailable.
     });
   }
