@@ -2,14 +2,17 @@
 
 **EXPLORE. BUILD. SURVIVE. DISCOVER.**
 
-KSA OUTPOST 86 is an independent educational planetary exploration and outpost-management simulator. This v2.3.0 reconstruction expands the supplied lunar training project into an Earth–Moon–Mars experience with a seven-day Martian campaign, a Babylon.js 3D world layer, a responsive Android-style interface and a 2D fallback.
+KSA OUTPOST 86 is an independent educational planetary exploration and outpost-management simulator. This v2.3.1 update expands the supplied lunar training project into an Earth–Moon–Mars experience with a seven-day Martian campaign, a Babylon.js 3D world layer, a responsive Android-style interface and a 2D fallback.
 
 > **Educational notice:** This is a fictional training simulation. NASA has not endorsed, certified or approved the application. Resource meters, mission events and vehicle behaviour are simplified educational models, not operational spacecraft specifications, medical guidance or live NASA telemetry.
 
-## What changed in v2.3.0
+## What changed in v2.3.1
 
 - Replaced the previous dark, box-heavy application shell with a warm ivory, sand, copper and terracotta visual system.
-- Added a fixed top app bar and adaptive fixed mobile bottom navigation.
+- Added full-viewport fixed top and bottom application bars with larger, clearer navigation targets.
+- Added an in-app How to Play handbook and a pre-flight mission briefing before expedition launch.
+- Added a visible START HERE cue and first-step instructions to Outpost Command.
+- Made Mars Day 6 rover sampling sequential: deploy the rover before the sample action is shown.
 - Added Earth, Moon and Mars destination selection and distinct procedural environments.
 - Added a Babylon.js rendering layer with WebGPU preference and WebGL fallback.
 - Added a 2D Canvas fallback so the core interface remains accessible if Babylon.js cannot load or WebGL is unavailable.
@@ -60,9 +63,13 @@ npm run build
 
 The normal GitHub Pages build retains the `/KSA-OUTPOST-86/` base path. Do not change the existing hosting configuration without checking the real production integration.
 
-## Controls and navigation
+## How to play
 
-The application provides Home, Missions, Planets, Outpost, Crew and Explore sections, with Science, Journal, Settings and Lunar Lander Lab available through the additional navigation menu. Planet selection changes the rendered environment. Mission operations and rover actions update the relevant simulation state. Reduced-motion and graphics settings are available in Settings.
+Start with **Start guided mission** or open **How to Play** in the top bar. Read the pre-flight briefing, launch the Moon or Mars expedition, then open **Outpost**. Follow the Primary Objective, select its action button and press **Complete day** when the objective is complete. Repeat through Day 7 and run the final assessment.
+
+The application is currently a command-and-management simulator, not a free-roaming third-person game. It does not have WASD astronaut walking or E-to-interact station controls. Drag the 3D scene to orbit the camera and use the mouse wheel to zoom. On touchscreens, swipe to orbit and pinch to zoom where supported. Mars Day 6 includes rover deployment, simple left/right rover controls in Explore, and sample collection after deployment.
+
+The application provides Home, Missions, Worlds, Outpost, Crew and Explore sections, with Science, Journal, Settings and Lunar Lander Lab available through More. Mission operations update the simulation state. See `docs/GAMEPLAY.md` for the complete seven-day guide.
 
 ## Data and privacy
 

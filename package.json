@@ -1,7 +1,7 @@
 {
   "name": "ksa-outpost-86",
   "private": true,
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "KSA OUTPOST 86 \u2014 Orbital Frontier planetary exploration and junior astronaut outpost training simulator.",
   "type": "module",
   "scripts": {

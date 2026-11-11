@@ -1,0 +1,30 @@
+KSA OUTPOST 86 — ORBITAL FRONTIER v2.3.1
+
+WHAT CHANGED
+- Full-width fixed top app bar.
+- Full-width fixed bottom navigation with clearer labels.
+- A persistent HOW TO PLAY button in the top bar and home screen.
+- A pre-flight briefing before Moon or Mars missions launch.
+- A START HERE instruction panel on the Outpost screen.
+- Mars Day 6 requires rover deployment before collecting the sample.
+
+HOW TO PLAY
+1. Open the site and click HOW TO PLAY, or click Start guided mission.
+2. Read the briefing and click Launch Mars expedition (or Moon expedition).
+3. When the journey completes, open Outpost on the bottom bar.
+4. Read the Primary Objective and click its action button.
+5. When the objective says COMPLETE, click Complete day.
+6. Repeat through Day 7 and run the final assessment.
+
+CURRENT CONTROLS
+- Drag the 3D scene to orbit the camera.
+- Use the mouse wheel to zoom.
+- On touchscreens, swipe to orbit and pinch to zoom.
+- Use mission buttons for operations.
+- On Mars Day 6, use Explore to deploy and steer the rover left/right, then return to Outpost to collect the sample.
+
+IMPORTANT HONEST SCOPE
+This version is a command-and-management training simulator. It does not currently include free-roaming astronaut WASD movement or E-to-interact stations. The Lander Lab is a separate simplified 2D exercise.
+
+DEPLOYMENT
+The ZIP includes DEPLOY-V2.3.1-TO-MAIN.ps1 and scripts/Deploy-To-GitHubMain.ps1. The bootstrap expects the ZIP in Downloads and the existing repository at %USERPROFILE%\KSA-OUTPOST-86 (or clones it if missing). It requires Git authentication and permission to push directly to main. It does not create a pull request or force-push.

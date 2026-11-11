@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ksa-outpost-86-shell-v6';
+const CACHE_NAME = 'ksa-outpost-86-shell-v7';
 const APP_SHELL = [
   './', './index.html', './manifest.webmanifest', './favicon.svg',
   './assets/audio/outpost-ambience.ogg', './assets/audio/suit-breathing.ogg',

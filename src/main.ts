@@ -28,7 +28,7 @@ const canvas = document.querySelector<HTMLCanvasElement>('#world-canvas');
 const appRoot = document.querySelector<HTMLElement>('#ui-root');
 if (!canvas || !appRoot) throw new Error('Application shell is incomplete.');
 
-type View = 'home' | 'missions' | 'planets' | 'outpost' | 'crew' | 'explore' | 'science' | 'journal' | 'settings' | 'lander';
+type View = 'home' | 'missions' | 'planets' | 'outpost' | 'crew' | 'explore' | 'science' | 'journal' | 'settings' | 'lander' | 'guide' | 'briefing';
 const navItems: Array<{ id: View; label: string; icon: string }> = [
   { id: 'home', label: 'Home', icon: '⌂' },
   { id: 'missions', label: 'Missions', icon: '◎' },
@@ -45,6 +45,7 @@ const crew = [
 ];
 
 let view: View = 'home';
+let pendingDestination: 'moon' | 'mars' = 'mars';
 let storedPlanet = 'mars';
 try { storedPlanet = localStorage.getItem('ksa-outpost-86-world-v1') || 'mars'; } catch { storedPlanet = 'mars'; }
 let planet: Planet = storedPlanet as Planet;
@@ -91,7 +92,8 @@ function renderToast(): void {
 }
 
 function navButton(item: { id: View; label: string; icon: string }): string {
-  return `<button class="nav-item ${view === item.id ? 'active' : ''}" data-action="navigate" data-value="${item.id}" aria-current="${view === item.id ? 'page' : 'false'}"><span class="nav-icon">${item.icon}</span><span>${item.label}</span></button>`;
+  const active = view === item.id || ((view === 'guide' || view === 'briefing') && item.id === 'home');
+  return `<button class="nav-item ${active ? 'active' : ''}" data-action="navigate" data-value="${item.id}" aria-current="${active ? 'page' : 'false'}"><span class="nav-icon">${item.icon}</span><span>${item.label}</span></button>`;
 }
 
 function renderHeader(): string {
@@ -101,7 +103,7 @@ function renderHeader(): string {
       <span class="brand-copy"><strong>KSA <em>OUTPOST 86</em></strong><small>ORBITAL FRONTIER</small></span>
     </button>
     <div class="topbar-center"><span class="live-indicator"></span><span>EXPEDITION SYSTEMS</span><span class="topbar-divider"></span><span>${esc(formatPlanet(planet).toUpperCase())}</span></div>
-    <div class="topbar-right"><span class="connection-label"><i></i> LOCAL SYSTEMS READY</span><button class="icon-button" data-action="navigate" data-value="settings" aria-label="Settings">⚙</button><span class="crew-avatar-mini">K</span></div>
+    <div class="topbar-right"><span class="connection-label"><i></i> LOCAL SYSTEMS READY</span><button class="help-button" data-action="navigate" data-value="guide" aria-label="Open how to play guide"><span aria-hidden="true">?</span><b>HOW TO PLAY</b></button><button class="icon-button" data-action="navigate" data-value="settings" aria-label="Settings">⚙</button><span class="crew-avatar-mini">K</span></div>
   </header>`;
 }
 
@@ -134,7 +136,7 @@ function renderHome(): string {
         <div class="eyebrow"><span class="eyebrow-line"></span> KSA OUTPOST 86 <span class="eyebrow-tag">FIELD OPERATIONS / 01</span></div>
         <h1>A new world<br><span>is waiting.</span></h1>
         <p class="hero-description">Lead your crew beyond Earth. Build a living outpost. Explore the unknown with a mission that responds to every decision.</p>
-        <div class="hero-actions"><button class="primary-cta" data-action="begin-expedition"><span>Begin expedition</span><b>↗</b></button><button class="text-cta" data-action="navigate" data-value="planets">Explore the worlds <span>→</span></button></div>
+        <div class="hero-actions"><button class="primary-cta" data-action="begin-expedition"><span>Start guided mission</span><b>↗</b></button><button class="text-cta" data-action="navigate" data-value="guide">How to play <span>→</span></button><button class="text-cta" data-action="navigate" data-value="planets">Explore worlds <span>→</span></button></div>
         <div class="hero-facts"><div><strong>03</strong><span>PLANETARY WORLDS</span></div><i></i><div><strong>07</strong><span>MISSION DAYS</span></div><i></i><div><strong>04</strong><span>CREW SPECIALISTS</span></div></div>
       </div>
       <aside class="hero-brief glass-surface">
@@ -151,6 +153,49 @@ function renderHome(): string {
     <div class="world-renderer-tag">${worldLoading ? 'INITIALISING 3D ENVIRONMENT' : world ? `${esc(world.rendererName.toUpperCase())} RENDERER · ${esc(planet.toUpperCase())}` : '2D MISSION FALLBACK'}</div>
     ${worldError ? `<div class="renderer-notice">${esc(worldError)} · The mission interface remains available.</div>` : ''}
     <div class="home-continuation"><div><span class="section-kicker">YOUR NEXT CHAPTER</span><h2>Three worlds.<br><em>One human ambition.</em></h2></div><p>From the blue edge of Earth to the silent lunar south pole and the rust-coloured plains of Mars, each expedition is a new test of ingenuity.</p><div class="continuation-actions"><button data-action="navigate" data-value="missions">View expeditions ↗</button><button data-action="navigate" data-value="science">Explore mission science ↗</button></div></div>
+  </section>`;
+}
+
+function openMissionBriefing(destination: 'moon' | 'mars'): void {
+  pendingDestination = destination;
+  planet = destination;
+  persistPlanet();
+  world?.setPlanet(destination);
+  view = 'briefing';
+  render();
+  window.scrollTo({ top: 0, behavior: settings.reducedMotion ? 'auto' : 'smooth' });
+}
+
+function renderBriefing(): string {
+  const isMars = pendingDestination === 'mars';
+  const title = isMars ? 'The Red Frontier' : 'First Light';
+  const place = isMars ? 'MARS / ARC-01' : 'LUNAR SOUTH POLE / POLAR-01';
+  const objective = isMars
+    ? 'Commission the habitat, stabilise essential resources, protect the crew and complete the ridge survey.'
+    : 'Restore the outpost through seven days of changing sunlight, water recovery and radiation conditions.';
+  const firstTask = isMars ? 'Inspect integrated systems' : 'Inspect the power console and life support';
+  return `<section class="page-view view-enter briefing-view">
+    <div class="page-heading"><div><span class="section-kicker">PRE-FLIGHT / MISSION BRIEFING</span><h1>Before you <em>depart.</em></h1><p>Read the mission objective and controls. You will launch only when you choose to.</p></div><div class="heading-index">PREP <span>/ 01</span></div></div>
+    <div class="briefing-hero ${pendingDestination}"><div class="briefing-copy"><span class="section-kicker">${place}</span><h2>${title}</h2><p>${objective}</p><div class="briefing-meta"><span><b>04</b> CREW SPECIALISTS</span><span><b>07</b> MISSION DAYS</span><span><b>${isMars ? '06' : '07'}</b> PRIMARY TASKS</span></div></div><div class="briefing-planet-mark"><span>${isMars ? 'MARS' : 'MOON'}</span><i></i></div></div>
+    <div class="briefing-columns"><article class="briefing-panel"><span class="section-kicker">YOUR FIRST TASK</span><h3>${firstTask}</h3><p>${isMars ? 'After arrival, open Outpost in the bottom navigation. In the Primary Objective section, select “Inspect integrated systems”. Then press “Complete day 1”.' : 'After arrival, open Outpost in the bottom navigation. Inspect both the power console and life-support system, then complete Day 1.'}</p><ol><li>Launch the expedition.</li><li>Open <strong>Outpost</strong> from the bottom bar.</li><li>Complete the highlighted objective using its action button.</li><li>Press <strong>Complete day</strong> to continue.</li></ol></article><article class="briefing-panel controls-panel"><span class="section-kicker">HOW TO CONTROL THE EXPERIENCE</span><div class="control-row"><kbd>DRAG</kbd><span>Rotate the 3D camera around the outpost.</span></div><div class="control-row"><kbd>WHEEL</kbd><span>Zoom the 3D camera in or out.</span></div><div class="control-row"><kbd>TOUCH</kbd><span>Swipe to orbit; pinch to zoom on supported screens.</span></div><div class="control-row"><kbd>TAP</kbd><span>Use the visible mission buttons and navigation.</span></div><p class="control-note">This version is a command-and-management training simulator, not a free-roaming WASD astronaut game.</p></article></div>
+    <div class="briefing-actions"><button class="secondary-button" data-action="navigate" data-value="guide">Read the full how-to guide</button><button class="primary-cta" data-action="launch-briefed-mission"><span>Launch ${isMars ? 'Mars' : 'Moon'} expedition</span><b>↗</b></button></div>
+  </section>`;
+}
+
+function renderGuide(): string {
+  return `<section class="page-view view-enter guide-view">
+    <div class="page-heading"><div><span class="section-kicker">PLAYER HANDBOOK / START HERE</span><h1>How to <em>play.</em></h1><p>Follow these steps to complete your first seven-day outpost mission. No gaming experience is required.</p></div><div class="heading-index">GUIDE <span>/ 01</span></div></div>
+    <div class="guide-intro"><div class="guide-intro-mark">86</div><div><strong>YOUR JOB: KEEP THE CREW AND OUTPOST SAFE.</strong><p>Each day gives you one main engineering decision. Complete it, review the result, then advance to the next day.</p></div></div>
+    <div class="guide-steps">
+      <article class="guide-step"><span class="guide-number">01</span><div><small>START</small><h3>Choose your expedition</h3><p>Press <strong>Start guided mission</strong>, or open <strong>Missions</strong> and choose First Light (Moon) or The Red Frontier (Mars). Read the briefing before launch.</p></div></article>
+      <article class="guide-step"><span class="guide-number">02</span><div><small>ARRIVE</small><h3>Open Outpost</h3><p>After the journey, select <strong>Outpost</strong> on the bottom bar. The top of the page shows your mission day, current alerts and resource levels.</p></div></article>
+      <article class="guide-step"><span class="guide-number">03</span><div><small>TAKE ACTION</small><h3>Complete today's objective</h3><p>Read the <strong>Primary Objective</strong>. Tap the action button underneath it. The button changes the training simulation and records your decision.</p></div></article>
+      <article class="guide-step"><span class="guide-number">04</span><div><small>ADVANCE</small><h3>Finish the mission day</h3><p>When the objective says <strong>COMPLETE</strong>, press <strong>Complete day</strong>. Resource production and consumption are calculated and the next event appears.</p></div></article>
+      <article class="guide-step"><span class="guide-number">05</span><div><small>EXPLORE</small><h3>Use the other sections</h3><p><strong>Worlds</strong> changes the planet view. <strong>Crew</strong> shows the four specialists. <strong>Explore</strong> contains rover deployment and sample collection. <strong>More</strong> opens Science, Journal, Lander Lab and Settings.</p></div></article>
+    </div>
+    <div class="guide-day-plan"><div class="guide-day-heading"><span class="section-kicker">MARS / SEVEN-DAY OBJECTIVE PLAN</span><strong>THE RED FRONTIER</strong></div><div class="guide-day-row"><b>DAY 1</b><span>Inspect integrated habitat systems.</span></div><div class="guide-day-row"><b>DAY 2</b><span>Choose a power plan for the dust front; service solar arrays if needed.</span></div><div class="guide-day-row"><b>DAY 3</b><span>Repair water recovery or conserve water.</span></div><div class="guide-day-row"><b>DAY 4</b><span>Secure the radiation shelter and suspend EVA.</span></div><div class="guide-day-row"><b>DAY 5</b><span>Choose greenhouse growth or a low-power holding schedule.</span></div><div class="guide-day-row"><b>DAY 6</b><span>Deploy the rover, then collect the ridge sample.</span></div><div class="guide-day-row"><b>DAY 7</b><span>Run the final mission assessment.</span></div></div>
+    <div class="guide-controls"><span class="section-kicker">3D VIEW CONTROLS</span><div><span><kbd>LEFT DRAG</kbd> Orbit camera</span><span><kbd>SCROLL</kbd> Zoom</span><span><kbd>TOUCH DRAG</kbd> Orbit</span><span><kbd>PINCH</kbd> Zoom</span></div><p>Important: this build uses a command-based management loop. It does not currently support walking an astronaut with W/A/S/D or pressing E to interact with 3D stations.</p></div>
+    <div class="guide-footer-actions"><button class="secondary-button" data-action="navigate" data-value="missions">Choose a mission</button><button class="primary-cta compact" data-action="open-default-briefing">Start Mars briefing <b>↗</b></button></div>
   </section>`;
 }
 
@@ -216,7 +261,7 @@ function renderObjectiveActions(): string {
       case 3: actions = `${buttonAction('Repair water recovery · 10 power', 'repair-water', marsMission.waterActionComplete)} ${buttonAction('Activate water conservation', 'conserve-water', marsMission.waterActionComplete)}`; break;
       case 4: actions = buttonAction('Secure radiation shelter', 'secure-shelter', marsMission.shelterSecured); break;
       case 5: actions = `${buttonAction('Run greenhouse growth cycle', 'greenhouse-grow', marsMission.greenhouseActionComplete)} ${buttonAction('Conserve greenhouse power', 'greenhouse-hold', marsMission.greenhouseActionComplete)}`; break;
-      case 6: actions = `${buttonAction('Deploy expedition rover', 'deploy-rover', marsMission.roverDeployed)} ${buttonAction('Collect ridge sample', 'collect-sample', marsMission.sampleCollected)}`; break;
+      case 6: actions = `${buttonAction('Deploy expedition rover', 'deploy-rover', marsMission.roverDeployed)} ${marsMission.roverDeployed ? buttonAction('Collect ridge sample', 'collect-sample', marsMission.sampleCollected) : '<span class="action-hint">Deploy the rover first. The sample action appears after deployment.</span>'}`; break;
       default: actions = buttonAction('Run final assessment', 'final-assessment', marsMission.finalAssessmentComplete);
     }
     return `<div class="objective-panel"><div class="objective-top"><span class="section-kicker">DAY ${marsMission.day} / 7 · PRIMARY OBJECTIVE</span><span class="objective-state ${objective.complete ? 'complete' : ''}">${objective.complete ? 'COMPLETE' : 'IN PROGRESS'}</span></div><h3>${objective.title}</h3><p>${objective.detail}</p><div class="objective-actions">${actions}</div>${marsMission.day < 7 ? `<button class="advance-button" data-action="advance-day" ${objective.complete ? '' : 'disabled'}>Complete day ${marsMission.day} <span>→</span></button>` : ''}</div>`;
@@ -245,6 +290,7 @@ function renderOutpost(): string {
   const metrics = getMetricState();
   const event = planet === 'mars' ? marsMission.events.find((item) => !item.resolved) : lunarMission.events.find((item) => !item.resolved);
   return `<section class="page-view view-enter"><div class="page-heading"><div><span class="section-kicker">SURFACE OPERATIONS / ${planet.toUpperCase()}</span><h1>Outpost <em>command.</em></h1><p>Monitor life-support, energy, habitat integrity and crew readiness. Every action changes the mission state.</p></div><div class="heading-index">03 <span>/ 07 SOLS</span></div></div>
+    <div class="outpost-start-here"><span class="start-here-badge">START HERE</span><div><strong>One objective at a time</strong><p>Read the Primary Objective below, tap its action button, then press <b>Complete day</b> when it becomes available. Your mission saves automatically in this browser.</p></div></div>
     <div class="outpost-overview"><div class="outpost-status"><span class="status-pulse"></span><span>${status === 'completed' ? 'MISSION COMPLETE' : `MISSION ACTIVE · DAY ${currentDay} / 7`}</span><strong>${planet === 'mars' ? 'MARS / ARC-01' : planet === 'moon' ? 'LUNA / POLAR-01' : 'EARTH / ORBITAL'}</strong></div><div class="outpost-condition"><span>HABITAT CONDITION</span><strong>${Math.round(planet === 'mars' ? marsMission.habitat : lunarMission.thermal)}<small>%</small></strong></div></div>
     ${event ? `<div class="alert-banner ${event.severity}"><span>!</span><div><strong>${esc(event.title)}</strong><p>${esc('detail' in event ? event.detail : event.description)}</p></div><small>DAY ${event.day}</small></div>` : ''}
     <div class="resource-layout"><div class="resource-grid">${metrics.map((item) => meter(item.label, item.value, item.meta, item.accent)).join('')}</div><aside class="resource-side"><div class="resource-ring-wrap">${progressRing(planet === 'mars' ? marsMission.habitat : lunarMission.thermal, 'HABITAT')}</div><div><span class="section-kicker">MISSION OPERATIONS</span><p>Review the daily objective and choose an operation. The simulation updates power, supplies and crew condition as the mission progresses.</p></div><button class="secondary-button full" data-action="navigate" data-value="missions">Mission overview ↗</button></aside></div>
@@ -288,7 +334,7 @@ function renderSettings(): string {
   return `<section class="page-view view-enter"><div class="page-heading"><div><span class="section-kicker">APPLICATION / PREFERENCES</span><h1>Mission <em>preferences.</em></h1><p>Configure the visual experience, motion, saved data and application information.</p></div><div class="heading-index">08 <span>/ CONFIG</span></div></div>
     <div class="settings-layout"><article class="settings-group"><span class="section-kicker">RENDERING</span><h3>Graphics quality</h3><p>Lower quality reduces detail and GPU workload on less powerful devices.</p><div class="segmented-control">${(['low', 'medium', 'high'] as const).map((value) => `<button data-action="quality" data-value="${value}" class="${settings.quality === value ? 'selected' : ''}">${value === 'low' ? 'Performance' : value === 'medium' ? 'Balanced' : 'High'}</button>`).join('')}</div><div class="setting-row"><div><strong>Reduced motion</strong><small>Limit camera and environmental movement.</small></div><button class="toggle ${settings.reducedMotion ? 'on' : ''}" data-action="toggle-motion" aria-pressed="${settings.reducedMotion}"><i></i></button></div><div class="setting-row"><div><strong>Mission audio</strong><small>Enable ambience and interface sound effects.</small></div><button class="toggle ${audioEnabled ? 'on' : ''}" data-action="toggle-audio" aria-pressed="${audioEnabled}"><i></i></button></div><div class="setting-row"><div><strong>Renderer status</strong><small>${world ? esc(world.rendererName) : worldLoading ? 'Initialising renderer' : '2D fallback active'}</small></div><span class="setting-value">${world ? 'CONNECTED' : 'FALLBACK'}</span></div></article>
     <article class="settings-group"><span class="section-kicker">MISSION DATA</span><h3>Local progress</h3><p>Mission data is stored in this browser. It is not synchronized across devices.</p><div class="setting-row"><div><strong>Lunar First Light</strong><small>Day ${lunarMission.day} / 7 · ${lunarMission.status}</small></div><button class="text-link" data-action="navigate" data-value="missions">Open →</button></div><div class="setting-row"><div><strong>Mars Expedition</strong><small>Day ${marsMission.day} / 7 · ${marsMission.status}</small></div><button class="text-link" data-action="navigate" data-value="missions">Open →</button></div><button class="secondary-button danger-button" data-action="reset-saves">Reset local mission saves</button></article></div>
-    <div class="about-strip"><div><span class="section-kicker">PROJECT IDENTITY</span><strong>KSA OUTPOST 86 / ORBITAL FRONTIER</strong><p>Independent educational planetary exploration experience. Not affiliated with or endorsed by NASA.</p></div><span class="version-label">BUILD 2.3 / FRONTIER</span></div>
+    <div class="about-strip"><div><span class="section-kicker">PROJECT IDENTITY</span><strong>KSA OUTPOST 86 / ORBITAL FRONTIER</strong><p>Independent educational planetary exploration experience. Not affiliated with or endorsed by NASA.</p></div><span class="version-label">BUILD 2.3.1 / FRONTIER</span></div>
   </section>`;
 }
 
@@ -300,6 +346,8 @@ function renderLander(): string {
 function renderPage(): string {
   switch (view) {
     case 'home': return renderHome();
+    case 'briefing': return renderBriefing();
+    case 'guide': return renderGuide();
     case 'missions': return renderMissions();
     case 'planets': return renderPlanets();
     case 'outpost': return renderOutpost();
@@ -313,7 +361,7 @@ function renderPage(): string {
 }
 
 function render(): void {
-  appRoot!.innerHTML = `${renderHeader()}<main class="app-main" id="app-main">${renderPage()}</main>${renderBottomNav()}<div id="toast-host" aria-live="polite"></div><div class="more-menu" id="more-menu" hidden><button data-action="navigate" data-value="science">Science & learning</button><button data-action="navigate" data-value="journal">Mission journal</button><button data-action="navigate" data-value="lander">Lunar Lander Lab</button><button data-action="navigate" data-value="settings">Settings</button></div>`;
+  appRoot!.innerHTML = `${renderHeader()}<main class="app-main" id="app-main">${renderPage()}</main>${renderBottomNav()}<div id="toast-host" aria-live="polite"></div><div class="more-menu" id="more-menu" hidden><button data-action="navigate" data-value="guide">How to play</button><button data-action="navigate" data-value="science">Science & learning</button><button data-action="navigate" data-value="journal">Mission journal</button><button data-action="navigate" data-value="lander">Lunar Lander Lab</button><button data-action="navigate" data-value="settings">Settings</button></div>`;
   renderToast();
 }
 
@@ -467,10 +515,12 @@ function handleClick(event: MouseEvent): void {
   switch (action) {
     case 'navigate': setView(value as View); break;
     case 'planet': if (['earth', 'moon', 'mars'].includes(value)) setPlanet(value as Planet); break;
-    case 'begin-expedition': beginEarthJourney(planet === 'moon' ? 'moon' : 'mars'); break;
+    case 'begin-expedition': openMissionBriefing(planet === 'moon' ? 'moon' : 'mars'); break;
+    case 'launch-briefed-mission': beginEarthJourney(pendingDestination); break;
+    case 'open-default-briefing': openMissionBriefing('mars'); break;
     case 'start-earth': setPlanet('earth'); setView('planets'); break;
-    case 'start-moon': beginEarthJourney('moon'); break;
-    case 'start-mars': beginEarthJourney('mars'); break;
+    case 'start-moon': openMissionBriefing('moon'); break;
+    case 'start-mars': openMissionBriefing('mars'); break;
     case 'more-menu': {
       const menu = document.querySelector<HTMLElement>('#more-menu');
       if (menu) menu.hidden = !menu.hidden;

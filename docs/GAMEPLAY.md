@@ -1,47 +1,51 @@
-# Gameplay and controls — Orbital Frontier
+# Gameplay and controls — Orbital Frontier v2.3.1
 
-## Destinations
+## Start your first mission
 
-- **Earth:** departure/orbit experience and the starting point for cinematic journeys.
-- **Moon:** the preserved First Light lunar south-pole training campaign.
-- **Mars:** the new seven-day Red Frontier expedition.
+1. Open the home screen and select **Start guided mission**, or open **Missions** and choose **The Red Frontier** (Mars) or **First Light** (Moon).
+2. Read the pre-flight briefing. It explains the destination, first objective and controls.
+3. Select **Launch Mars expedition** or **Launch Moon expedition**. The cinematic journey runs and the application opens the Outpost screen.
+4. On **Outpost**, read the **START HERE** instruction and the **Primary Objective**. Select the required action button.
+5. When the objective changes to **COMPLETE**, select **Complete day** to advance. The next day's event and objective then appear.
+6. Repeat through Day 7 and run the final assessment. Your mission progress saves locally in this browser.
 
-The Earth-to-destination sequence is a cinematic training representation. It is not a trajectory solver.
+## Current interaction model
 
-## Lunar mission — First Light
+This release is a **command-and-management training simulator**, not a free-roaming third-person game. There is no astronaut WASD walking or E-to-interact station mechanic in this build. The primary gameplay uses the navigation bar and visible mission-action buttons.
 
-The seven-day lunar campaign retains its existing deterministic training objectives:
-
-1. Day 1 — inspect power and life-support systems.
-2. Day 2 — choose a conserve, balanced or research power plan in reduced sunlight.
-3. Day 3 — repair water recovery or conserve water.
-4. Day 4 — secure the radiation shelter.
-5. Day 5 — choose a greenhouse growth or conservation plan.
-6. Day 6 — complete the science survey and collect a training sample.
-7. Day 7 — run the final systems assessment.
+- **3D camera:** drag with the mouse to orbit; use the mouse wheel to zoom. On touchscreens, swipe to orbit and pinch to zoom where supported.
+- **Mission actions:** select the action buttons in the Outpost Primary Objective panel.
+- **Advance mission:** complete the objective, then select **Complete day**. It is disabled until the current objective is complete.
+- **Rover (Mars Day 6):** open **Explore**, deploy the rover, use the left/right drive controls, then return to Outpost and collect the ridge sample. The sample objective is not complete until collection is confirmed.
+- **Planet views:** use **Worlds** to select Earth, Moon or Mars.
+- **Crew:** use **Crew** to review the four specialists. Assignments are recorded locally but are not yet a full individual crew-task simulation.
+- **More:** opens Science & learning, Mission journal, Lunar Lander Lab and Settings.
+- **Save:** mission progress is saved in the current browser. It is not synchronized to other devices.
 
 ## Mars mission — The Red Frontier
 
-The Mars campaign is an independent seven-day training model:
+| Day | Primary objective | Player action |
+|---|---|---|
+| 1 | Commission the habitat | Inspect integrated systems. |
+| 2 | Ride out the dust front | Choose conserve or balanced power. Array cleaning is an additional maintenance action. |
+| 3 | Stabilise water recovery | Repair the filter or activate water conservation. |
+| 4 | Protect the crew | Secure the radiation shelter. |
+| 5 | Keep the greenhouse productive | Choose a growth cycle or low-power holding schedule. |
+| 6 | Complete the ridge survey | Deploy the rover, then collect the sample. The Explore screen also provides simple rover left/right movement. |
+| 7 | Complete mission assessment | Run the final assessment. |
 
-1. Day 1 — commission the habitat and inspect integrated systems.
-2. Day 2 — choose balanced or conservative power under a regional dust front; array maintenance is available.
-3. Day 3 — repair the water-recovery filter or activate water conservation.
-4. Day 4 — suspend EVA activity and secure the habitat shelter during a solar-weather warning.
-5. Day 5 — choose greenhouse growth or a low-power holding schedule.
-6. Day 6 — deploy the rover and collect a simulated geological sample from the ridge route.
-7. Day 7 — assess crew readiness, reserves, habitat condition and mission progress.
+## Lunar mission — First Light
 
-Mission meters and consequences are normalized educational game values, not operational hardware specifications.
-
-## Controls
-
-The primary experience is navigated with on-screen controls, responsive navigation and mission action buttons. The scene supports planet selection, camera modes, rover deployment and rover drive actions. Graphics quality and reduced-motion options are available in Settings. The independent Lunar Lander Lab retains its own thrust and lateral-trim controls.
-
-## Crew assignments
-
-The Crew screen records assignments locally. Selected rest, habitat and power assignments apply small immediate training adjustments to shared readiness or system indicators. These are simplified game effects; this release does not model each astronaut's physiology or detailed task scheduling.
+The preserved seven-day lunar campaign covers commissioning, low sunlight and power planning, water recovery, radiation shelter, greenhouse scheduling, science survey and final assessment. The current objective panel shows the exact action required each day.
 
 ## Lunar Lander Lab
 
-The Lander Lab remains a separate two-dimensional training exercise. Its parameters and landing rubric are simplified game values, not real spacecraft requirements or validated lunar landing physics.
+Open **More → Lunar Lander Lab**. Select **Start descent**. Use the **Engine throttle** slider to control vertical thrust and the **Lateral control** slider to reduce sideways drift. Watch altitude, vertical speed and fuel. The target rubric is displayed below the controls. Use **Reset exercise** to try again. This is a simplified 2D training exercise, not validated spacecraft flight dynamics.
+
+## Mission Control helper
+
+Open **More → Science & learning**. Ask about the current objective, oxygen, power, water, radiation shelter, rover or crew readiness. It is an offline deterministic knowledge helper, not a cloud generative-AI service or live NASA data feed.
+
+## Educational limits
+
+Resource values and event outcomes are simplified training models, not spacecraft specifications, medical advice, radiation-dose guidance or live telemetry. The planetary worlds are procedural educational visualizations and should not be represented as measured NASA terrain unless a specific dataset is cited.

@@ -1,13 +1,9 @@
-KSA OUTPOST 86 — ORBITAL FRONTIER v2.3.0
+KSA OUTPOST 86 — ORBITAL FRONTIER v2.3.1
 
-This archive contains the rebuilt application source. It is designed to overlay the existing DavoniumTech/KSA-OUTPOST-86 repository.
+This is the v2.3.1 full-source package for the existing DavoniumTech/KSA-OUTPOST-86 repository.
 
-Important:
-- Preserve the existing .git directory and main branch.
-- The included scripts/Deploy-To-GitHubMain.ps1 performs a guarded direct-to-main overlay/push.
-- The deployment helper preserves .github, wrangler.jsonc, wrangler.toml, .env*, and .dev.vars* from the target repository.
-- It refuses an incorrect remote, dirty working tree, non-main branch or non-fast-forward update.
-- Babylon.js is loaded from its official CDN at runtime. See README.md and docs/LIMITATIONS.md.
-- TypeScript check passed and 39 unit tests passed in the release container.
-- A Vite production build was not run because dependencies/network access were unavailable in the release container.
-- No GitHub or Cloudflare deployment is claimed as complete.
+Primary updates: full-width fixed top and bottom application bars; persistent How to Play entry point; pre-flight mission briefing; first-task onboarding; visible Outpost START HERE guidance; sequential Mars rover deployment and sample collection; updated PWA shell cache version; safer PowerShell direct-to-main deployment helper.
+
+Preserved: Vite + TypeScript architecture, Babylon.js renderer and Canvas fallback, deterministic lunar First Light campaign, Mars seven-day training simulation, local saves, offline Mission Control helper, Lunar Lander Lab, audio, PWA and Cloudflare configuration.
+
+Current controls: command-and-management simulation with mission buttons; 3D camera drag/orbit and wheel/pinch zoom; rover left/right controls in Explore. No astronaut WASD walking or E-to-interact feature is claimed.
