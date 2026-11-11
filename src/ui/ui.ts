@@ -4,6 +4,7 @@ import {
   type MissionState,
 } from '../game/simulation';
 import type { Interactable } from '../engine/createWorld';
+import type { AssistantReply } from '../game/assistant';
 
 export type ScreenName = 'menu' | 'briefing' | 'guide' | 'about' | 'settings' | 'game' | 'pause' | 'debrief' | 'sources';
 
@@ -23,6 +24,8 @@ export interface UiCallbacks {
   panelOpened(): void;
   panelClosed(): void;
   joystick(x: number, y: number): void;
+  askAssistant(question: string): AssistantReply;
+  openAudioSettings(): void;
 }
 
 function bar(label: string, value: number, unit = '%'): string {
@@ -106,12 +109,15 @@ export class GameUI {
   private modalId: string | null = null;
   private toastTimer = 0;
   private nearest: Interactable | null = null;
+  private assistantOpen = false;
+  private assistantMessageCount = 0;
 
   constructor(root: HTMLElement, callbacks: UiCallbacks) {
     this.root = root;
     this.callbacks = callbacks;
     this.root.addEventListener('click', this.handleClick);
     this.root.addEventListener('change', this.handleChange);
+    this.root.addEventListener('submit', this.handleSubmit);
     this.renderMenu();
   }
 
@@ -228,7 +234,16 @@ export class GameUI {
       toast.className = 'mission-toast';
       this.root.append(toast);
     }
-    toast.innerHTML = `<span class="toast-mark">${tone === 'success' ? '✓' : tone === 'warning' ? '!' : 'i'}</span><span><strong>${title}</strong><small>${message}</small></span>`;
+    const mark = document.createElement('span');
+    mark.className = 'toast-mark';
+    mark.textContent = tone === 'success' ? '✓' : tone === 'warning' ? '!' : 'i';
+    const copy = document.createElement('span');
+    const heading = document.createElement('strong');
+    heading.textContent = title;
+    const detail = document.createElement('small');
+    detail.textContent = message;
+    copy.append(heading, detail);
+    toast.replaceChildren(mark, copy);
     toast.className = `mission-toast is-visible ${tone}`;
     window.clearTimeout(this.toastTimer);
     this.toastTimer = window.setTimeout(() => toast?.classList.remove('is-visible'), 4500);
@@ -236,12 +251,28 @@ export class GameUI {
 
   renderMissionLog(state: MissionState): void {
     const log = this.root.querySelector<HTMLElement>('#mission-log-list');
-    if (log) log.innerHTML = state.log.slice(0, 8).map((entry) => `<li><span>DAY ${entry.day}</span><strong>${entry.title}</strong><small>${entry.detail}</small></li>`).join('');
+    if (!log) return;
+    const entries = state.log.slice(0, 8).map((entry) => {
+      const item = document.createElement('li');
+      const day = document.createElement('span');
+      day.textContent = `DAY ${entry.day}`;
+      const title = document.createElement('strong');
+      title.textContent = entry.title;
+      const detail = document.createElement('small');
+      detail.textContent = entry.detail;
+      item.append(day, title, detail);
+      return item;
+    });
+    log.replaceChildren(...entries);
   }
 
   private handleClick = (event: Event): void => {
-    const target = (event.target as HTMLElement).closest<HTMLElement>('[data-ui-action], [data-mission-action]');
+    const target = (event.target as HTMLElement).closest<HTMLElement>('[data-ui-action], [data-mission-action], [data-assistant-action], [data-assistant-question]');
     if (!target) return;
+    const assistantAction = target.dataset.assistantAction;
+    if (assistantAction === 'toggle') { this.toggleAssistant(); return; }
+    if (assistantAction === 'close') { this.closeAssistant(); return; }
+    if (target.dataset.assistantQuestion) { this.submitAssistantQuestion(target.dataset.assistantQuestion); return; }
     const uiAction = target.dataset.uiAction;
     const missionAction = target.dataset.missionAction as MissionAction | undefined;
     if (missionAction) {
@@ -264,8 +295,20 @@ export class GameUI {
       case 'close-panel': this.closeInteraction(); break;
       case 'save': this.callbacks.saveMission(); this.showToast('Mission saved', 'Progress is stored on this device.', 'success'); break;
       case 'open-log': this.toggleLog(); break;
+      case 'open-audio-settings': this.callbacks.openAudioSettings(); break;
       case 'mobile-interact': if (this.nearest) this.callbacks.interact(this.nearest.id); else this.showToast('No system in range', 'Walk closer to a marked station first.', 'warning'); break;
     }
+  };
+
+  private handleSubmit = (event: Event): void => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || form.id !== 'mission-assistant-form') return;
+    event.preventDefault();
+    const input = form.querySelector<HTMLInputElement>('#mission-assistant-input');
+    if (!input) return;
+    this.submitAssistantQuestion(input.value);
+    input.value = '';
+    input.focus();
   };
 
   private handleChange = (event: Event): void => {
@@ -276,6 +319,61 @@ export class GameUI {
     }
     if (target.dataset.uiAction === 'reduced-motion') this.callbacks.setReducedMotion((target as HTMLInputElement).checked);
   };
+
+  private toggleAssistant(): void {
+    const panel = this.root.querySelector<HTMLElement>('#mission-assistant-panel');
+    const button = this.root.querySelector<HTMLButtonElement>('[data-assistant-action="toggle"]');
+    if (!panel || !button) return;
+    this.assistantOpen = !this.assistantOpen;
+    panel.hidden = !this.assistantOpen;
+    button.setAttribute('aria-expanded', String(this.assistantOpen));
+    if (this.assistantOpen && this.assistantMessageCount === 0) {
+      this.appendAssistantMessage(
+        'KSA MISSION CONTROL',
+        'I am the offline mission knowledge assistant. I can explain your current objective and the project’s power, life-support, water, shelter, greenhouse and science systems. I use local rules and mission state; I am not a cloud language model or a real spacecraft controller.',
+        'LOCAL KNOWLEDGE BASE',
+      );
+      this.submitAssistantQuestion('What is my current objective?', false);
+    }
+    if (this.assistantOpen) this.root.querySelector<HTMLInputElement>('#mission-assistant-input')?.focus();
+  }
+
+  private closeAssistant(): void {
+    this.assistantOpen = false;
+    const panel = this.root.querySelector<HTMLElement>('#mission-assistant-panel');
+    const button = this.root.querySelector<HTMLButtonElement>('[data-assistant-action="toggle"]');
+    if (panel) panel.hidden = true;
+    button?.setAttribute('aria-expanded', 'false');
+  }
+
+  private submitAssistantQuestion(question: string, includeUserMessage = true): void {
+    const clean = question.trim();
+    if (!clean) return;
+    if (includeUserMessage) this.appendAssistantMessage('YOU', clean);
+    const reply = this.callbacks.askAssistant(clean);
+    this.appendAssistantMessage('KSA MISSION CONTROL', reply.answer, reply.context);
+  }
+
+  private appendAssistantMessage(role: string, message: string, context?: string): void {
+    const transcript = this.root.querySelector<HTMLElement>('#mission-assistant-transcript');
+    if (!transcript) return;
+    const article = document.createElement('article');
+    article.className = `assistant-message ${role === 'YOU' ? 'is-user' : 'is-assistant'}`;
+    const heading = document.createElement('strong');
+    heading.textContent = role;
+    const body = document.createElement('p');
+    body.textContent = message;
+    article.append(heading, body);
+    if (context) {
+      const meta = document.createElement('small');
+      meta.textContent = context;
+      article.append(meta);
+    }
+    transcript.append(article);
+    this.assistantMessageCount += 1;
+    while (transcript.children.length > 12) transcript.firstElementChild?.remove();
+    transcript.scrollTop = transcript.scrollHeight;
+  }
 
   private toggleLog(): void {
     const log = this.root.querySelector<HTMLElement>('#mission-log');
@@ -294,7 +392,7 @@ export class GameUI {
       </div>
       <aside class="mission-preview"><div class="preview-tag">MISSION 01 <span>FIRST LIGHT</span></div><div class="preview-orbit"><div class="orbit-ring"></div><div class="orbit-moon"></div><div class="orbit-satellite">✦</div></div>
         <div class="preview-data"><div><small>LOCATION</small><strong>POLAR RIDGE</strong></div><div><small>DURATION</small><strong>7 DAYS</strong></div><div><small>ROLE</small><strong>OUTPOST COMMANDER</strong></div></div>
-        <div class="preview-foot"><span>FICTIONAL TRAINING SITE</span><span>V. 1.0</span></div>
+        <div class="preview-foot"><span>FICTIONAL TRAINING SITE</span><span>V. 2.1.0</span></div>
       </aside></div>
       <div class="menu-footer"><span>AN EDUCATIONAL PROJECT BY KSA</span><span>NOT A NASA PRODUCT · NOT ENGINEERING GUIDANCE</span></div>
     </div>`;
@@ -330,7 +428,7 @@ export class GameUI {
     this.root.innerHTML = `<div class="screen info-screen"><header class="screen-header"><div class="brand-lockup"><span class="brand-symbol">86</span><span><strong>KSA OUTPOST 86</strong><small>SETTINGS</small></span></div><button class="text-button" data-ui-action="menu">← BACK</button></header>
       <main class="info-layout narrow"><div class="eyebrow">ACCESSIBILITY & PERFORMANCE</div><h1>MISSION<br>SETTINGS.</h1><p class="lead">Adjust the experience for the device you are using. Preferences are stored on this device.</p>
         <div class="settings-list"><label><span><strong>Graphics quality</strong><small>Lower settings can help on older phones and laptops.</small></span><select data-ui-action="quality"><option value="low" ${settings.quality === 'low' ? 'selected' : ''}>Low</option><option value="medium" ${settings.quality === 'medium' ? 'selected' : ''}>Medium</option><option value="high" ${settings.quality === 'high' ? 'selected' : ''}>High</option></select></label><label><span><strong>Reduced motion</strong><small>Reduce interface transitions and non-essential movement.</small></span><input type="checkbox" data-ui-action="reduced-motion" ${settings.reducedMotion ? 'checked' : ''}></label></div>
-        <div class="training-note"><strong>AUDIO</strong><p>Sound effects and music are not included in this first release. The mission does not need audio to be completed.</p></div></main></div>`;
+        <div class="training-note"><strong>AUDIO CONTROLS</strong><p>Original training sound effects are included. Open the audio controls to enable them after interacting with the page, adjust volume or test the radio cue.</p><button class="secondary-button" data-ui-action="open-audio-settings">OPEN AUDIO CONTROLS <span>↗</span></button></div></main></div>`;
   }
 
   private hasSavedMission(): boolean {
@@ -341,7 +439,7 @@ export class GameUI {
     try {
       const value = JSON.parse(localStorage.getItem('ksa-outpost-86-settings-v1') || '{}') as { quality?: string; reducedMotion?: boolean };
       const quality = value.quality === 'low' || value.quality === 'high' ? value.quality : 'medium';
-      return { quality, reducedMotion: Boolean(value.reducedMotion) };
+      return { quality, reducedMotion: value.reducedMotion === true };
     } catch { return { quality: 'medium', reducedMotion: false }; }
   }
 
@@ -356,8 +454,10 @@ export class GameUI {
   }
 
   private renderGameShell(state?: MissionState): void {
+    this.assistantOpen = false;
+    this.assistantMessageCount = 0;
     this.root.innerHTML = `<div class="game-shell">
-      <header class="game-topbar"><div class="game-brand"><span class="brand-symbol small">86</span><span><strong>KSA OUTPOST 86</strong><small>MISSION 01 · FIRST LIGHT</small></span></div><div class="game-top-center"><span class="day-pill" data-hud="day">DAY 1 / 7</span><span class="system-pill"><i></i><b data-hud="alert">SYSTEMS NOMINAL</b></span></div><div class="game-top-actions"><button class="icon-button" data-ui-action="save" title="Save mission">↓</button><button class="icon-button" data-ui-action="open-log" title="Mission log">≡</button><button class="icon-button" data-ui-action="pause" title="Pause mission">Ⅱ</button></div></header>
+      <header class="game-topbar"><div class="game-brand"><span class="brand-symbol small">86</span><span><strong>KSA OUTPOST 86</strong><small>MISSION 01 · FIRST LIGHT</small></span></div><div class="game-top-center"><span class="day-pill" data-hud="day">DAY 1 / 7</span><span class="system-pill"><i></i><b data-hud="alert">SYSTEMS NOMINAL</b></span></div><div class="game-top-actions"><button class="assistant-open-button" type="button" data-assistant-action="toggle" aria-expanded="false" aria-controls="mission-assistant-panel">MISSION AI</button><button class="icon-button" data-ui-action="save" title="Save mission">↓</button><button class="icon-button" data-ui-action="open-log" title="Mission log">≡</button><button class="icon-button" data-ui-action="pause" title="Pause mission">Ⅱ</button></div></header>
       <aside class="resource-rail"><div class="rail-heading">OUTPOST STATUS</div>
         <div class="rail-resource"><span class="resource-icon power-icon">ϟ</span><div><small>BATTERY</small><strong data-hud="battery">78%</strong></div></div>
         <div class="rail-bar"><span data-resource="battery" class="good" style="width:78%"></span></div>
@@ -376,6 +476,13 @@ export class GameUI {
       <div class="mobile-controls"><div class="joystick" id="joystick"><div class="joystick-knob" id="joystick-knob"></div></div><button class="mobile-interact" data-ui-action="mobile-interact">INTERACT</button></div>
       <div id="interaction-panel" class="interaction-layer"></div>
       <aside id="mission-log" class="mission-log"><div class="log-heading"><strong>MISSION LOG</strong><button class="icon-button" data-ui-action="open-log">×</button></div><ol id="mission-log-list"></ol></aside>
+      <section id="mission-assistant-panel" class="mission-assistant-panel" role="dialog" aria-label="KSA Mission Control offline assistant" hidden>
+        <header class="assistant-panel-heading"><div><span>OFFLINE KNOWLEDGE SYSTEM</span><strong>KSA MISSION CONTROL AI</strong></div><button type="button" class="icon-button" data-assistant-action="close" aria-label="Close assistant">×</button></header>
+        <p class="assistant-disclaimer">Context-aware training help. No cloud AI, live NASA data or spacecraft control.</p>
+        <div id="mission-assistant-transcript" class="assistant-transcript" aria-live="polite" aria-relevant="additions"></div>
+        <div class="assistant-quick-prompts"><button type="button" data-assistant-question="What should I do here?">HELP HERE</button><button type="button" data-assistant-question="Explain life support">LIFE SUPPORT</button><button type="button" data-assistant-question="What about radiation?">RADIATION</button></div>
+        <form id="mission-assistant-form" class="assistant-form"><label class="sr-only" for="mission-assistant-input">Ask the mission assistant</label><input id="mission-assistant-input" name="question" maxlength="240" autocomplete="off" placeholder="Ask about this mission…" required /><button type="submit">ASK</button></form>
+      </section>
       <div class="training-watermark">KSA TRAINING SIMULATION · VALUES ARE ILLUSTRATIVE</div>
     </div>`;
     this.installJoystick();
@@ -442,6 +549,7 @@ export class GameUI {
   destroy(): void {
     this.root.removeEventListener('click', this.handleClick);
     this.root.removeEventListener('change', this.handleChange);
+    this.root.removeEventListener('submit', this.handleSubmit);
     window.clearTimeout(this.toastTimer);
   }
 }

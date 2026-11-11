@@ -28,11 +28,23 @@ test('rejects corrupt or incomplete saved mission data', () => {
   assert.equal(loadMission(), null);
 });
 
+test('rejects snapshots with invalid resource ranges or malformed event records', () => {
+  const valid = createInitialMission();
+  storage.corrupt('ksa-outpost-86-mission-v1', JSON.stringify({ ...valid, oxygen: 180 }));
+  assert.equal(loadMission(), null);
+  storage.corrupt('ksa-outpost-86-mission-v1', JSON.stringify({ ...valid, events: [{ id: 'broken' }] }));
+  assert.equal(loadMission(), null);
+  storage.corrupt('ksa-outpost-86-mission-v1', JSON.stringify({ ...valid, log: [{ day: 1, title: 4, detail: null }] }));
+  assert.equal(loadMission(), null);
+});
+
 test('loads safe default settings and persists supported preferences', () => {
   storage.removeItem('ksa-outpost-86-settings-v1');
   assert.deepEqual(loadSettings(), { quality: 'medium', reducedMotion: false });
   saveSettings({ quality: 'high', reducedMotion: true });
   assert.deepEqual(loadSettings(), { quality: 'high', reducedMotion: true });
+  storage.corrupt('ksa-outpost-86-settings-v1', JSON.stringify({ quality: 'high', reducedMotion: 'false' }));
+  assert.deepEqual(loadSettings(), { quality: 'high', reducedMotion: false });
 });
 
 test('handles disabled browser storage without crashing', () => {

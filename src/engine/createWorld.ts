@@ -56,6 +56,61 @@ function material(hex: number, metalness = 0.08, emissive = false): pc.StandardM
   return mat;
 }
 
+function smoothStep(edge0: number, edge1: number, value: number): number {
+  const t = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+function buildLunarTerrain(device: pc.GraphicsDevice, parent: pc.Entity): pc.Entity {
+  // A low-amplitude, deterministic height field gives the outer site real relief
+  // while the central outpost footprint remains nearly level for reliable movement.
+  const geometry = new pc.PlaneGeometry({
+    halfExtents: new pc.Vec2(24, 24),
+    widthSegments: 64,
+    lengthSegments: 64,
+  });
+  const positions = geometry.positions;
+  const craters = [
+    { x: -14, z: -9, radius: 3.0 },
+    { x: 13, z: -11, radius: 3.6 },
+    { x: 14, z: 10, radius: 2.5 },
+  ];
+
+  for (let index = 0; index < positions.length; index += 3) {
+    const x = positions[index];
+    const z = positions[index + 2];
+    const reliefBlend = smoothStep(10, 17, Math.hypot(x, z));
+    let height = (
+      Math.sin(x * 0.34 + Math.cos(z * 0.12)) * 0.11
+      + Math.cos(z * 0.29 - x * 0.09) * 0.075
+      + Math.sin((x + z) * 0.62) * 0.035
+    ) * reliefBlend;
+
+    for (const crater of craters) {
+      const distance = Math.hypot(x - crater.x, z - crater.z);
+      const basin = -0.2 * Math.exp(-Math.pow(distance / (crater.radius * 0.78), 2) * 2.2);
+      const rimDistance = (distance - crater.radius) / (crater.radius * 0.17);
+      const rim = 0.12 * Math.exp(-(rimDistance * rimDistance));
+      height += (basin + rim) * reliefBlend;
+    }
+    positions[index + 1] = height;
+  }
+
+  geometry.calculateNormals();
+  const mesh = pc.Mesh.fromGeometry(device, geometry);
+  const terrainMaterial = material(colors.regolith, 0.025);
+  terrainMaterial.diffuse = new pc.Color(0.43, 0.45, 0.48);
+  terrainMaterial.update();
+
+  const terrain = new pc.Entity('procedural lunar regolith height field');
+  const meshInstance = new pc.MeshInstance(mesh, terrainMaterial);
+  meshInstance.castShadows = false;
+  meshInstance.receiveShadows = true;
+  terrain.addComponent('render', { meshInstances: [meshInstance] });
+  parent.addChild(terrain);
+  return terrain;
+}
+
 function addPrimitive(
   parent: pc.Entity,
   name: string,
@@ -265,11 +320,6 @@ function makeRocks(root: pc.Entity): pc.Entity[] {
     rocks.push(rock);
     rock.setLocalEulerAngles(random() * 35, random() * 360, random() * 30);
   }
-  for (const crater of [{ x: -14, z: -9, s: 2.9 }, { x: 13, z: -11, s: 3.6 }, { x: 14, z: 10, s: 2.4 }]) {
-    addPrimitive(root, 'crater shadow', 'sphere', [crater.x, 0.03, crater.z], [crater.s, 0.08, crater.s * 0.8], material(0x343941));
-    addPrimitive(root, 'crater rim', 'sphere', [crater.x, 0.1, crater.z], [crater.s * 1.25, 0.16, crater.s], material(0x666a70));
-    addPrimitive(root, 'crater interior', 'sphere', [crater.x, 0.07, crater.z], [crater.s * 0.83, 0.055, crater.s * 0.63], material(0x454a51));
-  }
   return rocks;
 }
 
@@ -331,7 +381,7 @@ export async function createWorld(canvas: HTMLCanvasElement): Promise<WorldScene
   fill.setPosition(0, 7, 4);
   root.addChild(fill);
 
-  addPrimitive(root, 'lunar regolith surface', 'plane', [0, -0.08, 0], [48, 1, 48], material(colors.regolith, 0.02));
+  buildLunarTerrain(device, root);
   // Slightly raised, darker path slabs help students read the outpost layout.
   addPrimitive(root, 'habitat approach path', 'box', [0, 0.005, 5.5], [3.0, 0.06, 8.0], material(0x666d73));
   addPrimitive(root, 'power service path', 'box', [-5.0, 0.005, 0.3], [7.8, 0.06, 1.35], material(0x626970));

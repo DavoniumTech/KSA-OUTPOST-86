@@ -1,77 +1,73 @@
-# Deployment Guide — GitHub and Cloudflare Pages
+# Deployment Guide — Windows, GitHub Pages and Cloudflare
 
-## 1. Run locally first
+## 1. Extract and run locally
 
-Install Node.js and Git on Windows. Open PowerShell in the extracted project folder and run:
+Install Node.js 22.16 or later and Git for Windows. In PowerShell, use the folder where you saved the ZIP:
 
 ```powershell
-npm install
+$Project = Join-Path $HOME 'Downloads\KSA-OUTPOST-86'
+New-Item -ItemType Directory -Force -Path $Project | Out-Null
+Expand-Archive -LiteralPath (Join-Path $HOME 'Downloads\KSA-OUTPOST-86-2.1.0.zip') -DestinationPath $Project -Force
+Set-Location $Project
+npm ci
 npm run dev
 ```
 
-The ZIP does not contain `package-lock.json` because the build environment could not contact the npm registry. The first `npm install` creates it; commit that generated lockfile. After that, use `npm ci` for reproducible clean installs. Confirm the game opens and the mission can be completed before pushing it.
+Open the local URL printed by Vite (normally `http://localhost:5173`). Keep PowerShell open while testing. To test on an Android phone on the same Wi-Fi network, open the LAN URL printed by Vite.
 
-## 2. Push to GitHub
-
-The intended remote is:
-
-`https://github.com/DavoniumTech/KSA-OUTPOST-86.git`
-
-The production branch is `main`.
-
-The script `scripts/push-ksa-outpost-86.ps1` is designed to:
-
-- Ask for the source ZIP path.
-- Extract into a temporary workspace.
-- Check expected project files.
-- Clone or verify a local checkout.
-- Verify the remote URL and branch history.
-- Stop when it detects a non-empty/divergent remote or local uncommitted changes that need human review.
-- Run `npm install` on the first use if no lockfile exists (this creates a real `package-lock.json`); use `npm ci` once the lockfile is present. Then run type checking, tests and a production build.
-- Ask before copying files and committing.
-- Push without force-pushing.
-- Compare the remote `main` commit with the local commit after the push.
-
-Save the script as `push-ksa-outpost-86.ps1` or run it from the `scripts` folder. In PowerShell:
+Before deploying, run:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\scripts\push-ksa-outpost-86.ps1
+npm run typecheck
+npm test
+npm run build
 ```
 
-Authenticate with the existing Git Credential Manager or GitHub CLI browser sign-in. Never paste a password or token into the script.
+Do not proceed to deployment unless all three commands finish successfully. The current working environment did not complete `npm ci`, so the production build has not been independently verified in this update.
 
-The public repository page was empty when checked on 10 November 2026. In that case, the script will create the initial local `main` branch and make the first commit after validation. If the repository has since gained files or commits, do not force-push. Review the remote files on GitHub, clone the repository separately, compare them with the ZIP, and reconcile the histories deliberately. The script is intentionally conservative.
+## 2. GitHub Pages
 
-## 3. Create Cloudflare Pages project
+The repository includes `.github/workflows/deploy.yml`. After the project source is pushed to the `main` branch:
 
-1. Sign in to the Cloudflare dashboard.
-2. Open **Workers & Pages** and choose **Create application** / **Pages**.
-3. Choose the Git connection option and connect GitHub.
-4. Authorise access to `DavoniumTech/KSA-OUTPOST-86`.
-5. Select the `main` production branch.
-6. Use the following build settings.
+1. Open the GitHub repository's **Settings → Pages**.
+2. Set the build/deployment source to **GitHub Actions**.
+3. Confirm the repository's Actions workflow is enabled.
+4. Push a reviewed commit to `main`, or run **Deploy KSA OUTPOST 86** through the Actions tab.
+5. Wait for the workflow to finish successfully, then open the published Pages URL.
+6. Test the menu, mission entry, assistant, interactions and save/continue on the hosted site.
+
+The Vite configuration uses `/KSA-OUTPOST-86/` as the production base path for the GitHub Pages project URL. If the repository is renamed or hosted at a custom root domain, revisit `vite.config.ts` before rebuilding.
+
+## 3. Cloudflare Pages
+
+The application can also be built for a root-hosted static site. In the Cloudflare Pages project settings, set `WORKERS_CI` to `1` as a **build environment variable** so Vite uses `/` as its base path.
 
 | Setting | Value |
 |---|---|
-| Project name | `ksa-outpost-86` |
-| Production branch | `main` |
-| Root directory | `/` |
-| Framework preset | `Vite` (or Other if Vite is not listed) |
+| Framework preset | Vite (or Other) |
 | Build command | `npm run build` |
 | Build output directory | `dist` |
-| Environment variables | None |
+| Root directory | `/` |
+| Build environment variable | `WORKERS_CI=1` |
+| Runtime secrets | None required |
 
-7. Start the first deployment and wait for the dashboard to report success.
-8. Open the generated `*.pages.dev` address and test the complete mission.
-9. After the project is verified, configure a custom domain through the Pages **Custom domains** section if required.
+Connect the intended GitHub repository and choose `main` as the production branch. Deploy only after the GitHub repository and workflow state have been checked. After the first successful Pages deployment, open the generated `*.pages.dev` URL and validate it before attaching a custom domain.
 
-## 4. Future updates
+## 4. Cloudflare Worker static assets
 
-After the GitHub connection is active, pushing a new commit to `main` triggers a new production build. Check the Pages deployment log if a build fails. The public URL should be considered live only after the first deployment reports success and the game has been opened and tested.
+The archive includes `wrangler.jsonc`, which serves the `dist/` directory as Worker static assets. With Wrangler installed and authenticated, build with `WORKERS_CI=1` and deploy using Wrangler:
 
-Official instructions:
+```powershell
+$env:WORKERS_CI = '1'
+npm run build
+npx wrangler deploy
+Remove-Item Env:WORKERS_CI
+```
 
-- https://developers.cloudflare.com/pages/
-- https://developers.cloudflare.com/pages/configuration/git-integration/
-- https://developers.cloudflare.com/pages/configuration/build-configuration/
+This is a separate deployment target from Cloudflare Pages. It has not been deployed or validated from this environment. Confirm the target Cloudflare account and Worker name in the dashboard before deployment; do not assume it is the same service as Pages.
+
+## 5. Safe GitHub push helper
+
+`scripts/push-ksa-outpost-86.ps1` is a guarded convenience script. It does not force-push, but it can create a commit and push after you explicitly type `COPY` and `PUSH`. Read the script before executing it. It stops if the remote contains existing commits or the local history diverges. If it stops, compare and reconcile the repository histories manually; do not delete remote files or force-push to make the script continue.
+
+The ZIP does not include `.git` metadata. GitHub's actual branch history must therefore be checked from an authenticated local checkout immediately before any write. The archive itself is not evidence of the remote's current state.

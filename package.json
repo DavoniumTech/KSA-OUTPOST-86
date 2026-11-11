@@ -1,8 +1,8 @@
 {
   "name": "ksa-outpost-86",
   "private": true,
-  "version": "1.0.0",
-  "description": "KSA OUTPOST 86 \u2014 Build. Survive. Explore. A browser-based lunar outpost training mission.",
+  "version": "2.1.0",
+  "description": "KSA OUTPOST 86 — Build. Survive. Explore. An offline-first lunar outpost training mission.",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",

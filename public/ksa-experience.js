@@ -1,10 +1,10 @@
-/* KSA OUTPOST 86 — Mission Experience Layer v2.0.0
+/* KSA OUTPOST 86 — Mission Experience Layer v2.1.0
    Original UI, audio cues and procedural surface scan assets for the KSA student simulation.
    This layer augments the existing PlayCanvas experience; it does not replace the game engine. */
 (() => {
   'use strict';
 
-  const VERSION = '2.0.0';
+  const VERSION = '2.1.0';
   const app = document.getElementById('app');
   const uiRoot = document.getElementById('ui-root');
   if (!app || !uiRoot || document.getElementById('ksa-console')) return;
@@ -28,7 +28,21 @@
     item.volume = key === 'ambience' ? 0.19 : key === 'breathing' ? 0.13 : 0.38;
     return [key, item];
   }));
-  const sound = { effects: true, ambience: false, breathing: false, volume: 0.62, unlocked: false };
+  const SOUND_SETTINGS_KEY = 'ksa-outpost-86-audio-v1';
+  const loadSoundSettings = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SOUND_SETTINGS_KEY) || '{}');
+      return {
+        effects: saved.effects !== false,
+        ambience: saved.ambience === true,
+        breathing: saved.breathing === true,
+        volume: Number.isFinite(saved.volume) ? Math.max(0, Math.min(1, saved.volume)) : 0.62
+      };
+    } catch {
+      return { effects: true, ambience: false, breathing: false, volume: 0.62 };
+    }
+  };
+  const sound = { ...loadSoundSettings(), unlocked: false };
   let panelOpen = false;
   let activeTab = 'crew';
   let activeLayer = 'albedo';
@@ -107,7 +121,7 @@
         <p class="ksa-note">Procedural training visualization generated for this project. It is not a NASA observation, mapped landing site, or measured lunar elevation product.</p>
       </div>
       <div class="ksa-view" data-view="audio" hidden>
-        <div class="ksa-audio-banner"><span class="ksa-audio-orbit">⌁</span><div><span class="ksa-kicker">MISSION AUDIO SUITE</span><strong>OUTPOST COMMS</strong><small>Original synthesized training effects</small></div></div>
+        <div class="ksa-audio-banner"><span class="ksa-audio-orbit">⌁</span><div><span class="ksa-kicker">MISSION AUDIO SUITE</span><strong>OUTPOST COMMS</strong><small>Bundled training sound effects</small></div></div>
         <div class="ksa-audio-row"><div><b>Mission ambience</b><small>Low electrical room tone</small></div><button type="button" class="ksa-switch" data-audio="ambience" aria-pressed="false"><i></i></button></div>
         <div class="ksa-audio-row"><div><b>Suit breathing</b><small>Quiet crew breathing loop</small></div><button type="button" class="ksa-switch" data-audio="breathing" aria-pressed="false"><i></i></button></div>
         <div class="ksa-audio-row"><div><b>Interface & event cues</b><small>Radio, steps, alerts and success sounds</small></div><button type="button" class="ksa-switch is-on" data-audio="effects" aria-pressed="true"><i></i></button></div>
@@ -119,6 +133,29 @@
       <footer class="ksa-panel-foot"><span>BUILD. SURVIVE. EXPLORE.</span><span>OFFLINE-READY ASSETS</span></footer>
     </section>`;
   app.appendChild(consoleRoot);
+
+  const saveSoundSettings = () => {
+    try {
+      localStorage.setItem(SOUND_SETTINGS_KEY, JSON.stringify({
+        effects: sound.effects,
+        ambience: sound.ambience,
+        breathing: sound.breathing,
+        volume: sound.volume
+      }));
+    } catch { /* Audio remains usable for this session if storage is unavailable. */ }
+  };
+  const syncAudioControls = () => {
+    for (const key of ['effects', 'ambience', 'breathing']) {
+      const button = consoleRoot.querySelector(`[data-audio="${key}"]`);
+      button?.classList.toggle('is-on', Boolean(sound[key]));
+      button?.setAttribute('aria-pressed', String(Boolean(sound[key])));
+    }
+    const volume = consoleRoot.querySelector('#ksa-volume');
+    const volumeValue = consoleRoot.querySelector('#ksa-volume-value');
+    if (volume) volume.value = String(Math.round(sound.volume * 100));
+    if (volumeValue) volumeValue.value = `${Math.round(sound.volume * 100)}%`;
+  };
+  syncAudioControls();
 
   const launcher = consoleRoot.querySelector('.ksa-launcher');
   const panel = consoleRoot.querySelector('.ksa-panel');
@@ -151,7 +188,9 @@
       if (key === 'breathing') sound.breathing = !sound.breathing;
       toggle.classList.toggle('is-on', sound[key]);
       toggle.setAttribute('aria-pressed', String(sound[key]));
-      syncLoops(); if (key === 'effects' && sound.effects) play('radio');
+      syncLoops();
+      saveSoundSettings();
+      if (key === 'effects' && sound.effects) play('radio');
       play('click'); return;
     }
     const action = event.target.closest('[data-extra-action]')?.dataset.extraAction;
@@ -159,14 +198,20 @@
     if (action === 'test-audio') { unlockAudio(); play('radio'); }
   });
   consoleRoot.querySelector('#ksa-volume').addEventListener('input', (event) => {
-    sound.volume = Number(event.target.value) / 100;
-    consoleRoot.querySelector('#ksa-volume-value').value = `${event.target.value}%`;
+    sound.volume = Math.max(0, Math.min(1, Number(event.target.value) / 100));
+    consoleRoot.querySelector('#ksa-volume-value').value = `${Math.round(sound.volume * 100)}%`;
+    saveSoundSettings();
     Object.entries(audio).forEach(([key, item]) => { item.volume = sound.volume * (key === 'ambience' ? .3 : key === 'breathing' ? .22 : .72); });
   });
   consoleRoot.querySelector('#ksa-relief-opacity').addEventListener('input', (event) => {
     reliefOpacity = Number(event.target.value);
     consoleRoot.querySelector('#ksa-relief-value').value = `${reliefOpacity}%`;
     drawScanner();
+  });
+
+  window.addEventListener('ksa:open-audio-settings', () => {
+    setTab('audio');
+    setPanel(true);
   });
 
   // Inline the original vector so the suit's arms and legs can animate independently.
@@ -349,13 +394,13 @@
   // First-visit boot marker; never blocks the original menu or mission start.
   if (!prefersReducedMotion) {
     const boot = document.createElement('div'); boot.className = 'ksa-boot-stamp';
-    boot.innerHTML = '<span>86</span><b>OUTPOST SYSTEMS ONLINE</b><small>MISSION EXPERIENCE v2.0.0</small>';
+    boot.innerHTML = '<span>86</span><b>OUTPOST SYSTEMS ONLINE</b><small>MISSION EXPERIENCE v2.1.0</small>';
     app.appendChild(boot);
     window.setTimeout(() => boot.classList.add('is-gone'), 1450);
     window.setTimeout(() => boot.remove(), 2100);
   }
 
   // Keep controls available after the game swaps between menu, briefing, gameplay and debrief.
-  window.KSA_OUTPOST_EXPERIENCE = Object.freeze({ version: VERSION, open: () => setPanel(true), close: () => setPanel(false), setTab, getAudioState: () => ({ ...sound }) });
+  window.KSA_OUTPOST_EXPERIENCE = Object.freeze({ version: VERSION, open: (tab) => { if (tab) setTab(tab); setPanel(true); }, close: () => setPanel(false), setTab, getAudioState: () => ({ ...sound }) });
   window.addEventListener('resize', () => { if (panelOpen && activeTab === 'surface') drawScanner(); });
 })();

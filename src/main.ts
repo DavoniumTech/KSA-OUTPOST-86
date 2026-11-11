@@ -8,15 +8,31 @@ import {
 } from './game/simulation';
 import { loadMission, loadSettings, saveMission, saveSettings, type GameSettings } from './game/storage';
 import { createWorld, type WorldScene } from './engine/createWorld';
+import { answerMissionQuestion } from './game/assistant';
 import { GameUI, type ScreenName } from './ui/ui';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game-canvas');
 const uiRoot = document.querySelector<HTMLElement>('#ui-root');
 
 function showBootError(message: string): void {
-  if (uiRoot) {
-    uiRoot.innerHTML = `<div class="screen pause-screen"><div class="pause-panel"><div class="eyebrow">OUTPOST SYSTEM CHECK</div><h1>3D VIEW<br>UNAVAILABLE.</h1><p>${message}</p><p class="small-print">Try the latest Chrome or Edge with hardware acceleration enabled. The mission requires WebGL 2.</p></div></div>`;
-  }
+  if (!uiRoot) return;
+  const screen = document.createElement('div');
+  screen.className = 'screen pause-screen';
+  const panel = document.createElement('div');
+  panel.className = 'pause-panel';
+  const eyebrow = document.createElement('div');
+  eyebrow.className = 'eyebrow';
+  eyebrow.textContent = 'OUTPOST SYSTEM CHECK';
+  const heading = document.createElement('h1');
+  heading.textContent = '3D VIEW UNAVAILABLE.';
+  const detail = document.createElement('p');
+  detail.textContent = message;
+  const help = document.createElement('p');
+  help.className = 'small-print';
+  help.textContent = 'Try the latest Chrome or Edge with hardware acceleration enabled. The mission requires WebGL 2.';
+  panel.append(eyebrow, heading, detail, help);
+  screen.append(panel);
+  uiRoot.replaceChildren(screen);
 }
 
 async function boot(): Promise<void> {
@@ -160,6 +176,12 @@ async function boot(): Promise<void> {
     panelClosed(): void { if (screen === 'game') world.setPaused(false); },
     joystick(x: number, y: number): void {
       world.setTouchMove(x, y);
+    },
+    askAssistant(question: string) {
+      return answerMissionQuestion(question, mission, world.getNearestInteractable());
+    },
+    openAudioSettings(): void {
+      window.dispatchEvent(new Event('ksa:open-audio-settings'));
     },
   };
 

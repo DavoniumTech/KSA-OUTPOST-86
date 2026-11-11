@@ -79,10 +79,24 @@ try {
 Expand-Archive -LiteralPath $ZipPath -DestinationPath $ExtractPath -Force
 
 $ProjectRoot = $ExtractPath
-if (-not (Test-Path -LiteralPath (Join-Path $ProjectRoot 'package.json')) -or
-    -not (Test-Path -LiteralPath (Join-Path $ProjectRoot 'index.html')) -or
-    -not (Test-Path -LiteralPath (Join-Path $ProjectRoot 'src'))) {
-    Stop-WithMessage 'The extracted ZIP does not have the expected project root (package.json, index.html and src). No files were copied.'
+$HasProjectFiles = (Test-Path -LiteralPath (Join-Path $ProjectRoot 'package.json')) -and
+    (Test-Path -LiteralPath (Join-Path $ProjectRoot 'index.html')) -and
+    (Test-Path -LiteralPath (Join-Path $ProjectRoot 'src'))
+if (-not $HasProjectFiles) {
+    # GitHub-generated source ZIPs often contain one enclosing folder. Locate
+    # that folder safely instead of assuming the archive's root layout.
+    $ProjectCandidates = @(Get-ChildItem -LiteralPath $ExtractPath -Directory -Force | Where-Object {
+        (Test-Path -LiteralPath (Join-Path $_.FullName 'package.json')) -and
+        (Test-Path -LiteralPath (Join-Path $_.FullName 'index.html')) -and
+        (Test-Path -LiteralPath (Join-Path $_.FullName 'src'))
+    })
+    if ($ProjectCandidates.Count -eq 1) {
+        $ProjectRoot = $ProjectCandidates[0].FullName
+        $HasProjectFiles = $true
+    }
+}
+if (-not $HasProjectFiles) {
+    Stop-WithMessage 'The extracted ZIP does not contain one unambiguous project root (package.json, index.html and src). No files were copied.'
 }
 
 $RepoInput = Read-Host "Enter an existing local checkout path, or press Enter to use $RepoPath"
