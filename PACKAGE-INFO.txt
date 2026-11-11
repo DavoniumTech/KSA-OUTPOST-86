@@ -1,9 +1,26 @@
-KSA OUTPOST 86 — ORBITAL FRONTIER v2.3.1
+KSA OUTPOST 86 — VERSION 3.0.0
+ORBITAL FRONTIER: THE NEXT GENERATION PLANETARY ADVENTURE GAME
 
-This is the v2.3.1 full-source package for the existing DavoniumTech/KSA-OUTPOST-86 repository.
+Repository: https://github.com/DavoniumTech/KSA-OUTPOST-86.git
+Target branch: main
 
-Primary updates: full-width fixed top and bottom application bars; persistent How to Play entry point; pre-flight mission briefing; first-task onboarding; visible Outpost START HERE guidance; sequential Mars rover deployment and sample collection; updated PWA shell cache version; safer PowerShell direct-to-main deployment helper.
+Version 3 includes:
+- Three-step 3D onboarding: Meet Your Crew, Choose Your Planet, Learn to Command.
+- Earth, Moon and Mars planetary environments.
+- Babylon.js 9.35.0 via bundled npm dependency.
+- WebGPU preference, WebGL 2 fallback and Canvas fallback.
+- Third-person astronaut keyboard and mobile joystick controls.
+- Habitat entry and proximity-based station interactions.
+- Oxygen, solar-array and greenhouse interaction challenges.
+- Rover boarding, driving and proximity-based sample scanning.
+- Commander XP, persistent achievement badges and mission reward feedback.
+- Light Explorer, Dark Cosmos and Glass Blue themes.
+- Guest mode, account UI and Cloudflare Worker account/save/live-event API.
+- Existing lunar and Mars mission logic, local saves, Mission Control, audio and Lunar Lander Lab retained.
 
-Preserved: Vite + TypeScript architecture, Babylon.js renderer and Canvas fallback, deterministic lunar First Light campaign, Mars seven-day training simulation, local saves, offline Mission Control helper, Lunar Lander Lab, audio, PWA and Cloudflare configuration.
+Build: npm ci; npm run typecheck; npm test; npm run build
 
-Current controls: command-and-management simulation with mission buttons; 3D camera drag/orbit and wheel/pinch zoom; rover left/right controls in Explore. No astronaut WASD walking or E-to-interact feature is claimed.
+IMPORTANT SERVICE REQUIREMENTS:
+The account, server-save and WebSocket services require the Cloudflare Worker deployment and its Durable Object bindings. Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to GitHub Actions repository secrets to enable the optional Cloudflare deployment job. Browser alerts are supported while the tab is in the background; closed-browser Web Push is not implemented. Email verification and email-based password reset are not implemented in this release.
+
+This is an independent educational simulation and is not endorsed or certified by NASA. Terrain and 3D assets are procedural game assets unless an explicit source and licence are listed in the asset credits.

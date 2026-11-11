@@ -1,94 +1,111 @@
-# KSA OUTPOST 86 — ORBITAL FRONTIER
+# KSA OUTPOST 86 — Version 3.0.0
 
-**EXPLORE. BUILD. SURVIVE. DISCOVER.**
+## ORBITAL FRONTIER · A playable planetary adventure
 
-KSA OUTPOST 86 is an independent educational planetary exploration and outpost-management simulator. This v2.3.1 update expands the supplied lunar training project into an Earth–Moon–Mars experience with a seven-day Martian campaign, a Babylon.js 3D world layer, a responsive Android-style interface and a 2D fallback.
+KSA OUTPOST 86 is an independent educational space-exploration game. Version 3 moves the experience beyond a command dashboard: players complete a three-step interactive 3D onboarding, select Earth/Moon/Mars, control an astronaut, explore a habitat, operate mission stations, board and drive a rover, scan a sample site, and progress through the existing lunar and Martian outpost campaigns.
 
-> **Educational notice:** This is a fictional training simulation. NASA has not endorsed, certified or approved the application. Resource meters, mission events and vehicle behaviour are simplified educational models, not operational spacecraft specifications, medical guidance or live NASA telemetry.
+> **Educational notice:** This is an independent fictional training game. NASA has not endorsed, certified or approved it. Game resources, events and spacecraft journeys are simplified learning models, not operational specifications or live spacecraft telemetry.
 
-## What changed in v2.3.1
+## Play the game
 
-- Replaced the previous dark, box-heavy application shell with a warm ivory, sand, copper and terracotta visual system.
-- Added full-viewport fixed top and bottom application bars with larger, clearer navigation targets.
-- Added an in-app How to Play handbook and a pre-flight mission briefing before expedition launch.
-- Added a visible START HERE cue and first-step instructions to Outpost Command.
-- Made Mars Day 6 rover sampling sequential: deploy the rover before the sample action is shown.
-- Added Earth, Moon and Mars destination selection and distinct procedural environments.
-- Added a Babylon.js rendering layer with WebGPU preference and WebGL fallback.
-- Added a 2D Canvas fallback so the core interface remains accessible if Babylon.js cannot load or WebGL is unavailable.
-- Added animated spacecraft transit, a habitat complex, astronauts, solar equipment and rover scene elements.
-- Added a seven-day Mars expedition with resource management, events, crew readiness, rover sampling and a final assessment.
-- Preserved the deterministic First Light lunar mission, existing save system, offline Mission Control helper, Lunar Lander Lab, audio controls, PWA and existing Cloudflare/GitHub deployment configuration.
+1. Open the application and choose **Enter the Universe**.
+2. Complete the three onboarding steps: **Meet Your Crew**, **Choose Your Planet**, and **Learn to Command**. The final step teaches oxygen, power and water station interactions. Onboarding can be replayed from Settings.
+3. Choose **Start My Adventure**. Review the mission briefing and launch.
+4. In the game, use the controls below. Follow the Primary Objective shown on the left, travel to the highlighted station and complete its activity.
+5. Complete each day's objective before selecting **Complete Day**. Finish Day 7 and run the mission assessment.
 
-## Existing systems retained
+### Desktop controls
 
-The lunar First Light campaign, its power/life-support/water/radiation/greenhouse/science decisions, the local mission save, the deterministic Mission Control knowledge helper and the independent Lunar Lander Lab remain part of the application. Existing storage keys are retained where practical. Mars state uses a separate versioned key.
+| Control | Action |
+|---|---|
+| `W` `A` `S` `D` or arrow keys | Walk / drive |
+| Mouse drag | Orbit the camera |
+| Mouse wheel | Zoom |
+| `Shift` | Run |
+| `Space` | Jump |
+| `E` | Interact with the nearest highlighted station / board rover |
+| `F` | Scan when seated in the rover and at the sample beacon |
+| `Esc` | Pause / return to mission controls |
 
-## Technology and rendering
+### Mobile controls
 
-- Vite 7.2.x and TypeScript 5.9.x.
-- Babylon.js runtime, loaded from the official Babylon.js CDN at runtime.
-- WebGPU is attempted where supported; WebGL is the fallback.
-- A Canvas 2D planetary fallback is included.
-- Node's built-in test runner.
-- Browser-local mission persistence.
+Use the on-screen virtual joystick to move or steer. Drag the scene to adjust the camera. Use the **INTERACT**, **JUMP**, **SCAN** and **EXIT ROVER** buttons when they are visible. Allow the scene to finish loading before moving.
 
-**Network limitation:** Babylon.js is loaded from `https://cdn.babylonjs.com/babylon.js`; it is not bundled in this source archive. The container used to prepare this release could not resolve the npm registry or GitHub, so a local Babylon package could not be installed. The application falls back to the included Canvas 2D world if the CDN is unreachable. That fallback is not equivalent to the Babylon 3D renderer. The first successful Babylon launch therefore requires access to the official CDN.
+### Rover sample mission
 
-The planetary terrain, Earth surface and scene props in this release are procedurally generated for the simulation. They are not a claim of photogrammetric or measured NASA terrain. Existing archive imagery was not re-labelled as NASA data because its original provenance could not be independently confirmed.
+On Mars Day 6, deploy the rover from the rover station. Board it, drive to the turquoise beacon in the marked ridge area, then use **SCAN** (or `F`). Sampling is proximity-based; the scanner will not award a sample from across the map. Return to the outpost and complete the objective.
 
-## Requirements
+### Habitat and station activities
 
-- Node.js 22.16 or newer.
-- npm.
-- A modern browser. WebGL 2 is recommended; WebGPU is used where available.
+Walk to a glowing station marker and press `E` or tap **INTERACT**. Enter the habitat through the airlock. Inside, use the highlighted stations:
 
-## Install and build
+- **Oxygen:** align valves in order `A → C → B`, then verify.
+- **Solar service:** complete `ALIGN → CLEAR → LOCK` when the field challenge is available.
+- **Greenhouse:** complete `WATER → LIGHT → NUTRIENTS`, then start the growing cycle.
+- **Water recovery:** repair the filter or choose conservation.
+- **Science:** review the mission sample and discoveries.
+
+The current third-person character is procedurally modelled with articulated limb animation; it is not a captured motion/photogrammetry asset. The worlds and spacecraft are procedural educational environments, not NASA photogrammetry or measured surface datasets.
+
+## Commander progression and rewards
+
+The player earns Commander XP for completing mission days, finishing onboarding and collecting planetary samples. One-time achievements include First Commander, Lunar Field Scientist, Mars Field Scientist, First Light Graduate and Mars Expedition Complete. Guest rewards persist in this browser; signed-in rewards are included in the account's server-backed mission save when the Cloudflare Worker is deployed.
+
+Open the **Crew** section to view Commander XP and unlocked badges.
+
+## Player themes and accounts
+
+Open **More → Settings** to choose one of three live themes:
+
+- **Light Explorer:** ivory, sand and copper.
+- **Dark Cosmos:** deep navy and indigo.
+- **Glass Blue:** translucent blue surfaces and cyan accents.
+
+Guest play is available and stores progress in the current browser. Create an account from the profile/account screen to enable server-backed profile, save and mission-event synchronisation **after the Cloudflare Worker/API has been deployed and configured**. Guest data does not synchronise across devices.
+
+The account API uses a secure HttpOnly session cookie, PBKDF2 password hashing, per-email failed-login throttling, and user-keyed Durable Objects for saves and events. The current build does **not** include email verification, email-based password reset, or Web Push delivery after the browser is completely closed. Browser notifications can be enabled for important events while the tab is in the background; live events can reach another active signed-in session over WebSocket.
+
+## Technology
+
+- Vite 7 + TypeScript 5.
+- Babylon.js `@babylonjs/core` 9.35.0, bundled by Vite from the pinned npm dependency.
+- WebGPU is preferred when available; WebGL 2 is the fallback.
+- Canvas 2D fallback if Babylon/WebGL cannot initialise.
+- Cloudflare Worker API with Durable Objects for accounts, per-player records and live sessions.
+- Existing First Light lunar campaign, seven-day Mars campaign, save logic, Mission Control helper, audio system and Lunar Lander Lab retained.
+
+## Build and run
+
+Requires Node.js 22.16+ and npm.
 
 ```powershell
 npm ci
 npm run typecheck
 npm test
 npm run build
+npm run dev
 ```
 
-`npm run build` invokes type checking, unit tests and the Vite production build. The build and tests should be run in a network-enabled environment where the locked Vite dependencies are installed. The release-preparation container ran TypeScript and the Node test suite, but could not run Vite's production bundler because dependencies were not installed and outbound package-network access was unavailable. See `docs/TECHNICAL-REPORT-2.3.0.md`.
+`npm run build` runs TypeScript checks, the Node test suite and Vite's production bundler. For Cloudflare's root-path static build, set `WORKERS_CI=1` before running the build; the existing GitHub Pages build retains `/KSA-OUTPOST-86/` as its base path.
 
-For the Cloudflare Workers asset build, retain the repository's existing build convention:
+## Cloudflare online services
 
-```powershell
-$env:WORKERS_CI = '1'
-npm run build
-```
+The repository includes `worker/index.js` and `wrangler.jsonc`. The Worker defines `/api/health`, account registration/sign-in/profile/logout, private player saves, mission event history and per-player WebSocket live updates. Durable Object bindings and a V3 migration are declared in `wrangler.jsonc`.
 
-The normal GitHub Pages build retains the `/KSA-OUTPOST-86/` base path. Do not change the existing hosting configuration without checking the real production integration.
+The existing GitHub Actions workflow continues to deploy GitHub Pages. Its optional Cloudflare Worker job runs only when both repository Actions secrets are configured:
 
-## How to play
+- `CLOUDFLARE_API_TOKEN` — an API token authorised to deploy the Worker and manage its Durable Objects.
+- `CLOUDFLARE_ACCOUNT_ID` — the Cloudflare account ID.
 
-Start with **Start guided mission** or open **How to Play** in the top bar. Read the pre-flight briefing, launch the Moon or Mars expedition, then open **Outpost**. Follow the Primary Objective, select its action button and press **Complete day** when the objective is complete. Repeat through Day 7 and run the final assessment.
+After adding both secrets in GitHub repository Settings → Secrets and variables → Actions, the next push to `main` will attempt the Worker deployment. Confirm the custom domain/route `ksa-outpost-86.davoniumtech.com` is assigned to the intended Cloudflare zone and inspect the GitHub Actions run. A Git push alone does not prove a Cloudflare deployment succeeded. Existing account IDs, routes, variables and local secrets must be preserved when merging `wrangler.jsonc`.
 
-The application is currently a command-and-management simulator, not a free-roaming third-person game. It does not have WASD astronaut walking or E-to-interact station controls. Drag the 3D scene to orbit the camera and use the mouse wheel to zoom. On touchscreens, swipe to orbit and pinch to zoom where supported. Mars Day 6 includes rover deployment, simple left/right rover controls in Explore, and sample collection after deployment.
-
-The application provides Home, Missions, Worlds, Outpost, Crew and Explore sections, with Science, Journal, Settings and Lunar Lander Lab available through More. Mission operations update the simulation state. See `docs/GAMEPLAY.md` for the complete seven-day guide.
-
-## Data and privacy
-
-Mission progress and settings are stored locally in the current browser. The supplied project does not configure accounts or a cross-device backend, so local saves do not synchronize across devices. The core game does not require a NASA API key or cloud AI service. The Mission Control helper is deterministic and offline; it is not a generative AI connection.
-
-## Deployment
-
-The target repository is `https://github.com/DavoniumTech/KSA-OUTPOST-86.git`, branch `main`. The included `scripts/Deploy-To-GitHubMain.ps1` supports a safe package overlay and direct push. The bootstrap command should be copied from the release delivery instructions. It requires Git authentication and permission to push to `main`, and it refuses a dirty working tree, incorrect remote, non-main branch or non-fast-forward update.
-
-The existing `wrangler.jsonc`, `.github` workflows, `wrangler.toml`, `.env*` and `.dev.vars*` are deliberately protected by the deployment script. The supplied GitHub Actions workflow deploys GitHub Pages; it is not evidence that Cloudflare is connected. Cloudflare deployment depends on the project's existing authenticated integration/configuration and must be verified separately. A successful Git push alone is not proof of a Cloudflare deployment.
-
-## Science and asset references
+## Science and credits
 
 - [NASA Science](https://science.nasa.gov/)
 - [NASA Eyes](https://science.nasa.gov/eyes/)
 - [NASA 3D Resources](https://science.nasa.gov/3d-resources/)
 - [NASA Solar System Treks](https://trek.nasa.gov/)
-- [NASA API portal](https://api.nasa.gov/)
-- [Babylon.js](https://www.babylonjs.com/)
-- [Babylon.js documentation](https://doc.babylonjs.com/)
+- [NASA APIs](https://api.nasa.gov/)
+- [Babylon.js](https://www.babylonjs.com/) · [Documentation](https://doc.babylonjs.com/)
 
-These are references for learning and future data/asset integration. This release does not claim that all visual assets or planetary elevations are NASA-sourced. Review `docs/ASSETS.md`, `docs/SCIENCE.md` and `docs/LIMITATIONS.md`.
+These are scientific and technical references, not a claim that every procedural terrain or model in this build is NASA-sourced. Review `docs/ASSETS.md` and `docs/SCIENCE.md` for the assets and educational assumptions.

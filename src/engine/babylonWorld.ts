@@ -1,3 +1,6 @@
+// @ts-ignore -- The pinned Babylon.js package is installed by npm ci for production builds.
+import * as Babylon from '@babylonjs/core/Legacy/legacy';
+
 export type Planet = 'earth' | 'moon' | 'mars';
 export type GraphicsQuality = 'low' | 'medium' | 'high';
 export type CameraMode = 'overview' | 'habitat' | 'rover' | 'horizon';
@@ -12,6 +15,17 @@ export interface BabylonWorld {
   setCameraMode(mode: CameraMode): void;
   deployRover(): void;
   driveRover(direction: number): void;
+  setPlayerControlled(enabled: boolean): void;
+  setJoystick(x: number, y: number): void;
+  jumpPlayer(): void;
+  atSampleSite(): boolean;
+  getNearbyInteractable(): Interactable | null;
+  interactNearest(): Interactable | null;
+  setVehicleMode(enabled: boolean): void;
+  setVehicleInput(x: number, y: number): void;
+  enterHabitat(): void;
+  exitHabitat(): void;
+  focusStation(id: string): void;
   playJourney(destination: Planet, onComplete?: () => void): void;
   destroy(): void;
   readonly rendererName: string;
@@ -24,23 +38,8 @@ interface WorldOptions {
 }
 
 function loadBabylon(): Promise<any> {
-  if (window.BABYLON) return Promise.resolve(window.BABYLON);
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>('script[data-babylon-runtime]');
-    if (existing) {
-      existing.addEventListener('load', () => window.BABYLON ? resolve(window.BABYLON) : reject(new Error('Babylon.js loaded without its runtime namespace.')), { once: true });
-      existing.addEventListener('error', () => reject(new Error('The Babylon.js CDN could not be reached.')), { once: true });
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://cdn.babylonjs.com/babylon.js';
-    script.async = true;
-    script.dataset.babylonRuntime = 'true';
-    script.crossOrigin = 'anonymous';
-    script.onload = () => window.BABYLON ? resolve(window.BABYLON) : reject(new Error('Babylon.js loaded without its runtime namespace.'));
-    script.onerror = () => reject(new Error('Babylon.js could not be downloaded. Check the network connection or CDN availability.'));
-    document.head.append(script);
-  });
+  // The engine is bundled by Vite from the pinned npm dependency. No runtime CDN script is required.
+  return Promise.resolve(Babylon as any);
 }
 
 function hash(x: number, z: number, seed = 1): number {
@@ -190,6 +189,40 @@ function createStars(B: any, scene: any): void {
   }
 }
 
+function createAtmosphericDust(B: any, scene: any, planet: Planet): any {
+  if (planet !== 'mars') return null;
+  const texture = new B.DynamicTexture('mars-dust-particle', { width: 64, height: 64 }, scene, false);
+  const ctx = texture.getContext() as CanvasRenderingContext2D;
+  const gradient = ctx.createRadialGradient(32, 32, 1, 32, 32, 30);
+  gradient.addColorStop(0, 'rgba(255,224,199,0.85)');
+  gradient.addColorStop(0.38, 'rgba(234,164,126,0.30)');
+  gradient.addColorStop(1, 'rgba(234,164,126,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 64, 64);
+  texture.update(false);
+  const dust = new B.ParticleSystem('mars-atmospheric-dust', 220, scene);
+  dust.particleTexture = texture;
+  dust.emitter = new B.Vector3(0, 2, 0);
+  dust.minEmitBox = new B.Vector3(-78, 1.5, -74);
+  dust.maxEmitBox = new B.Vector3(78, 17, 74);
+  dust.color1 = new B.Color4(0.96, 0.68, 0.48, 0.34);
+  dust.color2 = new B.Color4(0.72, 0.39, 0.27, 0.24);
+  dust.colorDead = new B.Color4(0.55, 0.3, 0.22, 0);
+  dust.minSize = 0.05;
+  dust.maxSize = 0.34;
+  dust.minLifeTime = 5;
+  dust.maxLifeTime = 15;
+  dust.emitRate = 26;
+  dust.direction1 = new B.Vector3(-0.75, 0.04, -0.18);
+  dust.direction2 = new B.Vector3(-0.12, 0.25, 0.3);
+  dust.minEmitPower = 0.16;
+  dust.maxEmitPower = 0.62;
+  dust.updateSpeed = 0.012;
+  dust.blendMode = B.ParticleSystem.BLENDMODE_STANDARD;
+  dust.start();
+  return dust;
+}
+
 function createTerrain(B: any, scene: any, planet: Planet, baseUrl: string, quality: GraphicsQuality): any {
   const size = planet === 'mars' ? 180 : 150;
   const segments = quality === 'low' ? 72 : quality === 'medium' ? 112 : 156;
@@ -256,6 +289,26 @@ function createRock(B: any, scene: any, x: number, z: number, scale: number, col
   rock.material = material(B, scene, `rock-mat-${index}`, color, 1);
   rock.receiveShadows = true;
   return rock;
+}
+
+function createSampleBeacon(B: any, scene: any, x: number, z: number, planet: Planet): any {
+  const root = new B.TransformNode('science-sample-beacon', scene);
+  root.position.set(x, terrainHeight(x, z, planet), z);
+  const metal = material(B, scene, 'sample-beacon-metal', '#526c75', 0.4, 0.58);
+  const glow = new B.StandardMaterial('sample-beacon-glow', scene);
+  glow.emissiveColor = new B.Color3(0.16, 0.88, 0.82);
+  glow.disableLighting = true;
+  const base = B.MeshBuilder.CreateCylinder('sample-beacon-base', { height: 0.55, diameter: 1.8, tessellation: 24 }, scene);
+  base.position.y = 0.28; base.material = metal; base.parent = root;
+  const mast = B.MeshBuilder.CreateCylinder('sample-beacon-mast', { height: 3.8, diameter: 0.13, tessellation: 12 }, scene);
+  mast.position.y = 2.25; mast.material = metal; mast.parent = root;
+  const lamp = B.MeshBuilder.CreateSphere('sample-beacon-lamp', { diameter: 0.82, segments: 20 }, scene);
+  lamp.position.y = 4.25; lamp.material = glow; lamp.parent = root;
+  const ring = B.MeshBuilder.CreateTorus('sample-beacon-ring', { diameter: 4.5, thickness: 0.12, tessellation: 48 }, scene);
+  ring.rotation.x = Math.PI / 2; ring.position.y = 0.12; ring.material = glow; ring.parent = root;
+  const halo = B.MeshBuilder.CreateTorus('sample-beacon-halo', { diameter: 2.1, thickness: 0.07, tessellation: 40 }, scene);
+  halo.rotation.x = Math.PI / 2; halo.position.y = 4.25; halo.material = glow; halo.parent = root;
+  return root;
 }
 
 function addCrater(B: any, scene: any, x: number, z: number, radius: number, planet: Planet): void {
@@ -395,7 +448,7 @@ function createRover(B: any, scene: any, x: number, z: number, planet: Planet = 
 
 function createAstronaut(B: any, scene: any, x: number, z: number, index: number, planet: Planet = 'mars'): any {
   const root = new B.TransformNode(`astronaut-${index}`, scene);
-  root.position.set(x, terrainHeight(x, z, planet) - 1.5, z);
+  root.position.set(x, terrainHeight(x, z, planet) + 0.12, z);
   const suit = material(B, scene, `astronaut-suit-${index}`, '#eee5d5', 0.82, 0.04);
   const trim = material(B, scene, `astronaut-trim-${index}`, index % 2 ? '#bf7848' : '#526b7a', 0.55, 0.2);
   const visor = new B.PBRMaterial(`astronaut-visor-${index}`, scene);
@@ -435,6 +488,33 @@ function createAstronaut(B: any, scene: any, x: number, z: number, index: number
   badge.position.set(0, 2.1, -0.54);
   badge.material = trim;
   badge.parent = root;
+  for (const side of [-1, 1]) {
+    const boot = B.MeshBuilder.CreateBox(`astronaut-boot-${index}-${side}`, { width: 0.56, height: 0.3, depth: 0.86 }, scene);
+    boot.position.set(side * 0.32, 0.12, -0.16);
+    boot.material = trim;
+    boot.parent = root;
+    const glove = B.MeshBuilder.CreateSphere(`astronaut-glove-${index}-${side}`, { diameter: 0.52, segments: 14 }, scene);
+    glove.position.set(side * 0.76, 1.26, -0.03);
+    glove.material = trim;
+    glove.parent = root;
+    const shoulder = B.MeshBuilder.CreateSphere(`astronaut-shoulder-${index}-${side}`, { diameter: 0.68, segments: 16 }, scene);
+    shoulder.position.set(side * 0.69, 2.33, 0);
+    shoulder.scaling.y = 0.82;
+    shoulder.material = suit;
+    shoulder.parent = root;
+  }
+  const chestLightMat = new B.StandardMaterial(`astronaut-chest-light-${index}`, scene);
+  chestLightMat.emissiveColor = new B.Color3(0.18, 0.72, 0.74);
+  chestLightMat.disableLighting = true;
+  const chestLight = B.MeshBuilder.CreateSphere(`astronaut-status-light-${index}`, { diameter: 0.12, segments: 12 }, scene);
+  chestLight.position.set(0.19, 2.33, -0.58);
+  chestLight.material = chestLightMat;
+  chestLight.parent = root;
+  const packTank = B.MeshBuilder.CreateCylinder(`astronaut-oxygen-tank-${index}`, { height: 0.9, diameter: 0.28, tessellation: 16 }, scene);
+  packTank.rotation.z = Math.PI / 2;
+  packTank.position.set(-0.18, 2.1, 0.91);
+  packTank.material = trim;
+  packTank.parent = root;
   return { root, limbs: [armL, armR, legL, legR] };
 }
 
@@ -494,6 +574,69 @@ function createSpacecraft(B: any, scene: any, x: number, z: number): any {
   return root;
 }
 
+
+function createStationTerminal(B: any, scene: any, id: string, title: string, x: number, z: number, planet: Planet, color = '#d88a55', baseHeight?: number): void {
+  const root = new B.TransformNode(`station-${id}`, scene);
+  root.metadata = { title };
+  const indoor = ['oxygen', 'power', 'water', 'greenhouse', 'science', 'shelter'].includes(id);
+  root.position.set(x, baseHeight ?? (indoor ? 0.3 : terrainHeight(x, z, planet)), z);
+  const frame = material(B, scene, `${id}-terminal-frame`, '#3d4d59', 0.44, 0.55);
+  const shell = material(B, scene, `${id}-terminal-shell`, '#d8d4c8', 0.62, 0.12);
+  const glow = new B.StandardMaterial(`${id}-terminal-glow`, scene);
+  glow.emissiveColor = B.Color3.FromHexString(color);
+  glow.disableLighting = true;
+  const pedestal = B.MeshBuilder.CreateBox(`${id}-terminal-pedestal`, { width: 1.45, height: 1.55, depth: 0.72 }, scene);
+  pedestal.position.y = 0.82; pedestal.material = frame; pedestal.parent = root;
+  const screen = B.MeshBuilder.CreateBox(`${id}-terminal-screen`, { width: 1.22, height: 0.9, depth: 0.12 }, scene);
+  screen.position.set(0, 1.72, -0.39); screen.material = shell; screen.parent = root;
+  const status = B.MeshBuilder.CreateBox(`${id}-terminal-status`, { width: 0.62, height: 0.12, depth: 0.05 }, scene);
+  status.position.set(0, 1.82, -0.47); status.material = glow; status.parent = root;
+  const ring = B.MeshBuilder.CreateTorus(`${id}-station-ring`, { diameter: 2.45, thickness: 0.075, tessellation: 40 }, scene);
+  ring.rotation.x = Math.PI / 2; ring.position.y = 0.15; ring.material = glow; ring.parent = root;
+}
+
+function createHabitatInterior(B: any, scene: any, planet: Planet): void {
+  const cx = 49;
+  const cz = 58;
+  const floorMat = material(B, scene, 'habitat-interior-floor', '#aeb8b6', 0.82, 0.08);
+  const wallMat = material(B, scene, 'habitat-interior-wall', '#e4e2d7', 0.72, 0.06);
+  const trimMat = material(B, scene, 'habitat-interior-trim', '#465766', 0.42, 0.5);
+  const glassMat = material(B, scene, 'habitat-interior-glass', '#70b3c6', 0.2, 0.18);
+  glassMat.alpha = 0.34;
+  const floor = B.MeshBuilder.CreateBox('habitat-interior-floor', { width: 27, height: 0.35, depth: 23 }, scene);
+  floor.position.set(cx, 0.05, cz); floor.material = floorMat;
+  for (const [x, z, width, height, depth] of [
+    [cx, cz - 11.4, 27, 5.2, 0.35], [cx, cz + 11.4, 27, 5.2, 0.35],
+    [cx - 13.4, cz, 0.35, 5.2, 23], [cx + 13.4, cz, 0.35, 5.2, 23],
+  ]) {
+    const wall = B.MeshBuilder.CreateBox(`habitat-interior-wall-${x}-${z}`, { width, height, depth }, scene);
+    wall.position.set(x, 2.65, z); wall.material = wallMat;
+  }
+  const ceiling = B.MeshBuilder.CreateBox('habitat-interior-ceiling', { width: 27, height: 0.35, depth: 23 }, scene);
+  ceiling.position.set(cx, 5.25, cz); ceiling.material = trimMat;
+  const ceilingLight = new B.PointLight('habitat-interior-light', new B.Vector3(cx, 4.6, cz), scene);
+  ceilingLight.intensity = 0.9; ceilingLight.diffuse = new B.Color3(0.75, 0.86, 0.95); ceilingLight.range = 38;
+  const window = B.MeshBuilder.CreateBox('habitat-interior-observation-window', { width: 8.4, height: 2.4, depth: 0.18 }, scene);
+  window.position.set(cx, 3.1, cz - 11.12); window.material = glassMat;
+  const consoleRow = (id: string, x: number, z: number, color: string): void => createStationTerminal(B, scene, id, id, x, z, planet, color);
+  consoleRow('oxygen', cx - 8.4, cz - 4.5, '#4da5d0');
+  consoleRow('power', cx, cz - 4.5, '#edb34e');
+  consoleRow('water', cx + 8.4, cz - 4.5, '#53aeb9');
+  consoleRow('greenhouse', cx - 8.4, cz + 6.2, '#82b875');
+  consoleRow('science', cx + 8.4, cz + 6.2, '#9b8ed3');
+  consoleRow('shelter', cx, cz + 6.2, '#c97873');
+  // Raised crop beds and plant growth make the greenhouse a place, not just a menu.
+  for (let i = 0; i < 5; i += 1) {
+    const bed = B.MeshBuilder.CreateBox(`greenhouse-bed-${i}`, { width: 2.4, height: 0.42, depth: 1.3 }, scene);
+    bed.position.set(cx - 1.2 + i * 1.2, 0.45, cz + 8.6); bed.material = material(B, scene, `greenhouse-bed-mat-${i}`, '#625344', 0.95);
+    for (let j = 0; j < 3; j += 1) {
+      const stem = B.MeshBuilder.CreateCylinder(`greenhouse-stem-${i}-${j}`, { height: 0.8 + (j % 2) * 0.25, diameter: 0.07 }, scene);
+      stem.position.set(cx - 1.8 + i * 1.2 + j * 0.2, 0.9, cz + 8.25 + j * 0.32);
+      stem.material = material(B, scene, `greenhouse-stem-mat-${i}-${j}`, '#4b8c57', 0.9);
+    }
+  }
+}
+
 function addLunarEarth(B: any, scene: any): void {
   const earth = B.MeshBuilder.CreateSphere('earth-in-lunar-sky', { diameter: 12, segments: 48 }, scene);
   earth.position.set(-37, 30, 58);
@@ -543,10 +686,33 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
   let journeyDestination: Planet = 'mars';
   let journeyCallback: (() => void) | undefined;
   let animationTime = 0;
+  let playerControlled = false;
+  let vehicleMode = false;
+  let insideHabitat = false;
+  let jumpVelocity = 0;
+  let sampleSitePosition: any = null;
+  let sampleBeacon: any = null;
+  let dustSystem: any = null;
+  const solarArrayRoots: any[] = [];
+  let shadowGenerator: any = null;
+  let postPipeline: any = null;
+  let joystickX = 0;
+  let joystickY = 0;
+  let vehicleX = 0;
+  let vehicleY = 0;
+  const pressedKeys = new Set<string>();
+  let playerAstronaut: any = null;
+  const stationRecords: Array<{ id: string; title: string; description: string; position: any; radius: number }> = [];
+  let nearbyInteractable: Interactable | null = null;
 
   const rebuildScene = (destination: Planet): void => {
+    if (dustSystem) { try { dustSystem.stop(); } catch { /* disposed with scene */ } dustSystem = null; }
+    if (shadowGenerator) { try { shadowGenerator.dispose(); } catch { /* scene may already be disposed */ } shadowGenerator = null; }
+    if (postPipeline) { try { postPipeline.dispose(); } catch { /* scene may already be disposed */ } postPipeline = null; }
     if (scene) scene.dispose();
+    solarArrayRoots.length = 0;
     planet = destination;
+    animationTime = 0;
     scene = new B.Scene(engine);
     scene.clearColor = destination === 'earth'
       ? new B.Color4(0.025, 0.09, 0.16, 1)
@@ -570,12 +736,21 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
     const sun = new B.DirectionalLight('solar-key', new B.Vector3(-0.55, -1, 0.44), scene);
     sun.position = new B.Vector3(45, 70, -40);
     sun.intensity = destination === 'moon' ? 2.45 : 1.8;
-    sun.shadowEnabled = false;
+    sun.shadowEnabled = quality !== 'low';
     createStars(B, scene);
+    dustSystem = createAtmosphericDust(B, scene, destination);
     roverRoot = undefined;
     roverWheels = [];
     roverDeployed = false;
     astronautRoots = [];
+    playerAstronaut = null;
+    stationRecords.length = 0;
+    nearbyInteractable = null;
+    vehicleMode = false;
+    insideHabitat = false;
+    jumpVelocity = 0;
+    sampleSitePosition = null;
+    sampleBeacon = null;
     spacecraftRoot = undefined;
 
     if (destination === 'earth') {
@@ -597,6 +772,31 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
       atmosphereMat.backFaceCulling = false;
       atmosphere.material = atmosphereMat;
       camera.setTarget(B.Vector3.Zero());
+      const orbitalPlatform = B.MeshBuilder.CreateCylinder('orbital-platform', { diameter: 13, height: 0.6, tessellation: 48 }, scene);
+      orbitalPlatform.position.set(-25, 2.0, 2);
+      orbitalPlatform.material = material(B, scene, 'orbital-platform-mat', '#6c7781', 0.5, 0.45);
+      playerAstronaut = createAstronaut(B, scene, -22, 2, 0, 'earth');
+      playerAstronaut.root.position.y = 2.34;
+      astronautRoots.push(playerAstronaut);
+      const flightConsole = B.MeshBuilder.CreateBox('orbital-flight-console', { width: 1.8, height: 1.65, depth: 0.8 }, scene);
+      flightConsole.position.set(-25, 3.25, 7.2);
+      flightConsole.material = material(B, scene, 'orbital-flight-console-mat', '#7b8b91', 0.35, 0.5);
+      const flightScreen = B.MeshBuilder.CreateBox('orbital-flight-screen', { width: 1.35, height: 0.82, depth: 0.08 }, scene);
+      flightScreen.position.set(-25, 3.55, 6.76);
+      flightScreen.material = material(B, scene, 'orbital-flight-screen-mat', '#2e8aa5', 0.24, 0.22);
+      flightScreen.material.emissiveColor = new B.Color3(0.03, 0.18, 0.28);
+      stationRecords.push({ id: 'command', title: 'Orbital flight deck', description: 'Review expedition readiness and planetary navigation.', position: new B.Vector3(-25, 2.34, 5.6), radius: 6 });
+
+      // The Earth-orbit onboarding area contains the same three systems the
+      // player learns in the tutorial, so every Step 3 interaction is real.
+      createStationTerminal(B, scene, 'oxygen', 'Oxygen', -29, 2, 'earth', '#54b8d8', 2.34);
+      createStationTerminal(B, scene, 'power', 'Power', -25, -2, 'earth', '#efb64d', 2.34);
+      createStationTerminal(B, scene, 'water', 'Water', -21, 2, 'earth', '#52b9b0', 2.34);
+      stationRecords.push(
+        { id: 'oxygen', title: 'Oxygen systems', description: 'Inspect atmospheric reserves and activate life support.', position: new B.Vector3(-29, 2.34, 2), radius: 3.4 },
+        { id: 'power', title: 'Power systems', description: 'Inspect solar generation and orbital battery storage.', position: new B.Vector3(-25, 2.34, -2), radius: 3.4 },
+        { id: 'water', title: 'Water recovery', description: 'Inspect and activate the water recovery unit.', position: new B.Vector3(-21, 2.34, 2), radius: 3.4 },
+      );
       camera.radius = 44;
       const orbital = B.MeshBuilder.CreateTorus('orbital-path', { diameter: 36, thickness: 0.05, tessellation: 160 }, scene);
       orbital.rotation.x = Math.PI / 2.8;
@@ -636,11 +836,30 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
         for (let i = 0; i < 6; i += 1) addCrater(B, scene, -48 + i * 21, 44 - (i % 2) * 21, 4.4 + (i % 3) * 2.4, 'mars');
         createHabitat(B, scene, -7, 0, 'mars-primary', true);
         createHabitat(B, scene, 14, -8, 'mars-laboratory', true);
-        createSolarArray(B, scene, -21, -15, 'mars-west-array');
-        createSolarArray(B, scene, 25, 10, 'mars-east-array');
+        solarArrayRoots.push(createSolarArray(B, scene, -21, -15, 'mars-west-array'));
+        solarArrayRoots.push(createSolarArray(B, scene, 25, 10, 'mars-east-array'));
         roverRoot = createRover(B, scene, 14, 16).root;
+        sampleSitePosition = new B.Vector3(-31, terrainHeight(-31, 30, 'mars') + 0.3, 30);
+        sampleBeacon = createSampleBeacon(B, scene, -31, 30, 'mars');
         roverWheels = roverRoot.getChildMeshes(false).filter((mesh: any) => mesh.name.startsWith('rover-wheel'));
-        astronautRoots = [createAstronaut(B, scene, -2, 8, 1), createAstronaut(B, scene, 3, 9, 2), createAstronaut(B, scene, -14, -4, 3)];
+        astronautRoots = [createAstronaut(B, scene, -4, 9, 1), createAstronaut(B, scene, 3, 9, 2), createAstronaut(B, scene, -14, -4, 3)];
+        playerAstronaut = astronautRoots[0];
+        createStationTerminal(B, scene, 'airlock-exterior', 'Airlock', -7, 0, 'mars', '#e6a269');
+        createStationTerminal(B, scene, 'command-exterior', 'Command', -12, 7, 'mars', '#72a7cb');
+        createHabitatInterior(B, scene, 'mars');
+        stationRecords.push(
+          { id: 'airlock', title: 'Enter habitat', description: 'Step inside Outpost 86.', position: new B.Vector3(-7, terrainHeight(-7, 0, 'mars'), 0), radius: 5.5 },
+          { id: 'rover', title: 'Drive expedition rover', description: 'Enter the six-wheel rover and drive the ridge route.', position: new B.Vector3(14, terrainHeight(14, 16, 'mars'), 16), radius: 5.8 },
+          { id: 'command', title: 'Mission command', description: 'Review the current mission and crew operations.', position: new B.Vector3(-12, terrainHeight(-12, 7, 'mars'), 7), radius: 5.5 },
+          { id: 'shelter', title: 'Radiation shelter', description: 'Reach the shielded habitat during solar weather.', position: new B.Vector3(-3, terrainHeight(-3, 7, 'mars'), 7), radius: 4.5 },
+          { id: 'oxygen', title: 'Oxygen & life support', description: 'Inspect oxygen supply and cabin air systems.', position: new B.Vector3(40.6, 0.3, 53.5), radius: 5.5 },
+          { id: 'power', title: 'Power console', description: 'Balance solar generation, battery and system demand.', position: new B.Vector3(49, 0.3, 53.5), radius: 5.5 },
+          { id: 'water', title: 'Water recovery', description: 'Repair the filter or conserve the water reserve.', position: new B.Vector3(57.4, 0.3, 53.5), radius: 5.5 },
+          { id: 'greenhouse', title: 'Greenhouse', description: 'Grow crops and manage food production.', position: new B.Vector3(40.6, 0.3, 64.2), radius: 5.5 },
+          { id: 'science', title: 'Science laboratory', description: 'Study geological samples and discoveries.', position: new B.Vector3(57.4, 0.3, 64.2), radius: 5.5 },
+          { id: 'shelter', title: 'Radiation shelter', description: 'Secure the protected crew volume.', position: new B.Vector3(49, 0.3, 64.2), radius: 5.5 },
+          { id: 'exit-habitat', title: 'Exit habitat', description: 'Return to the Martian surface.', position: new B.Vector3(49, 0.3, 47), radius: 5.5 },
+        );
         spacecraftRoot = createSpacecraft(B, scene, 46, -31);
         spacecraftRoot.position.set(42, 8, -32);
       } else {
@@ -661,7 +880,23 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
         createSolarArray(B, scene, -24, -18, 'lunar-array', 'moon');
         roverRoot = createRover(B, scene, 15, 15, 'moon').root;
         roverWheels = roverRoot.getChildMeshes(false).filter((mesh: any) => mesh.name.startsWith('rover-wheel'));
-        astronautRoots = [createAstronaut(B, scene, -1, 9, 1, 'moon'), createAstronaut(B, scene, 4, 9, 2, 'moon')];
+        astronautRoots = [createAstronaut(B, scene, -4, 9, 1, 'moon'), createAstronaut(B, scene, 4, 9, 2, 'moon')];
+        playerAstronaut = astronautRoots[0];
+        createStationTerminal(B, scene, 'lunar-airlock-exterior', 'Airlock', -7, 0, 'moon', '#e6a269');
+        createHabitatInterior(B, scene, 'moon');
+        stationRecords.push(
+          { id: 'airlock', title: 'Enter lunar habitat', description: 'Step inside the lunar outpost.', position: new B.Vector3(-7, terrainHeight(-7, 0, 'moon'), 0), radius: 5.5 },
+          { id: 'rover', title: 'Drive lunar rover', description: 'Enter the lunar surface vehicle.', position: new B.Vector3(15, terrainHeight(15, 15, 'moon'), 15), radius: 5.8 },
+          { id: 'command', title: 'Mission command', description: 'Review the lunar mission.', position: new B.Vector3(-12, terrainHeight(-12, 7, 'moon'), 7), radius: 5.5 },
+          { id: 'shelter', title: 'Radiation shelter', description: 'Reach the shielded habitat during solar weather.', position: new B.Vector3(-3, terrainHeight(-3, 7, 'moon'), 7), radius: 4.5 },
+          { id: 'oxygen', title: 'Oxygen & life support', description: 'Inspect oxygen and cabin air.', position: new B.Vector3(40.6, 0.3, 53.5), radius: 5.5 },
+          { id: 'power', title: 'Power console', description: 'Balance power demand and generation.', position: new B.Vector3(49, 0.3, 53.5), radius: 5.5 },
+          { id: 'water', title: 'Water recovery', description: 'Repair or conserve water.', position: new B.Vector3(57.4, 0.3, 53.5), radius: 5.5 },
+          { id: 'greenhouse', title: 'Greenhouse', description: 'Manage crop production.', position: new B.Vector3(40.6, 0.3, 64.2), radius: 5.5 },
+          { id: 'science', title: 'Science laboratory', description: 'Collect and analyse a training sample.', position: new B.Vector3(57.4, 0.3, 64.2), radius: 5.5 },
+          { id: 'shelter', title: 'Radiation shelter', description: 'Secure the protected crew volume.', position: new B.Vector3(49, 0.3, 64.2), radius: 5.5 },
+          { id: 'exit-habitat', title: 'Exit habitat', description: 'Return to the lunar surface.', position: new B.Vector3(49, 0.3, 47), radius: 5.5 },
+        );
         addLunarEarth(B, scene);
         spacecraftRoot = createSpacecraft(B, scene, 43, -24);
         spacecraftRoot.position.set(38, 10, -27);
@@ -669,22 +904,126 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
       camera.setTarget(new B.Vector3(0, 2, 0));
       camera.radius = isMars ? 55 : 50;
     }
+
+    // Desktop-quality lighting with conservative mobile defaults.
+    if (quality !== 'low') {
+      try {
+        shadowGenerator = new B.ShadowGenerator(quality === 'high' ? 1536 : 1024, sun);
+        shadowGenerator.useBlurExponentialShadowMap = true;
+        shadowGenerator.blurKernel = quality === 'high' ? 20 : 12;
+        shadowGenerator.bias = 0.00045;
+        for (const mesh of scene.meshes) {
+          if (/^(astronaut-|rover-|habitat-|mars-|lunar-)/.test(mesh.name) && mesh.isVisible) {
+            shadowGenerator.addShadowCaster(mesh);
+          }
+        }
+        const ground = scene.getMeshByName(`${destination}-terrain`);
+        if (ground) ground.receiveShadows = true;
+      } catch { shadowGenerator = null; }
+    }
+    try {
+      postPipeline = new B.DefaultRenderingPipeline('orbital-frontier-post', true, scene, [camera]);
+      postPipeline.fxaaEnabled = true;
+      postPipeline.bloomEnabled = quality === 'high';
+      postPipeline.bloomThreshold = 0.84;
+      postPipeline.bloomWeight = 0.22;
+      postPipeline.bloomKernel = 48;
+    } catch { postPipeline = null; }
+
     scene.onBeforeRenderObservable.add(() => {
-      if (paused || reducedMotion) return;
+      if (paused) return;
       const dt = Math.min(engine.getDeltaTime() / 1000, 0.05);
-      animationTime += dt;
-      if (destination === 'earth') {
-        const cloudLayer = scene.getMeshByName('earth-cloud-shell');
-        if (cloudLayer) cloudLayer.rotation.y += dt * 0.012;
-        const globe = scene.getMeshByName('planet-earth');
-        if (globe) globe.rotation.y += dt * 0.006;
+      if (!reducedMotion) animationTime += dt;
+      // Character and rover control: keyboard + virtual joystick share one movement model.
+      if (playerControlled && playerAstronaut && !vehicleMode) {
+        const forwardInput = (pressedKeys.has('w') || pressedKeys.has('arrowup') ? 1 : 0) - (pressedKeys.has('s') || pressedKeys.has('arrowdown') ? 1 : 0) - joystickY;
+        const strafeInput = (pressedKeys.has('d') || pressedKeys.has('arrowright') ? 1 : 0) - (pressedKeys.has('a') || pressedKeys.has('arrowleft') ? 1 : 0) + joystickX;
+        const length = Math.hypot(forwardInput, strafeInput);
+        if (length > 0.05) {
+          const speed = (pressedKeys.has('shift') ? 9.2 : 5.6) * (destination === 'moon' ? 0.62 : 1);
+          const forwardX = -Math.cos(camera.alpha);
+          const forwardZ = -Math.sin(camera.alpha);
+          const rightX = -forwardZ;
+          const rightZ = forwardX;
+          const mx = (forwardX * forwardInput + rightX * strafeInput) / Math.max(1, length);
+          const mz = (forwardZ * forwardInput + rightZ * strafeInput) / Math.max(1, length);
+          playerAstronaut.root.position.x += mx * speed * dt;
+          playerAstronaut.root.position.z += mz * speed * dt;
+          const xBounds = destination === 'earth' ? [-31, -19] : insideHabitat ? [37.5, 60.5] : [-79, 79];
+          const zBounds = destination === 'earth' ? [-4, 8] : insideHabitat ? [48, 69] : [-79, 79];
+          playerAstronaut.root.position.x = Math.max(xBounds[0], Math.min(xBounds[1], playerAstronaut.root.position.x));
+          playerAstronaut.root.position.z = Math.max(zBounds[0], Math.min(zBounds[1], playerAstronaut.root.position.z));
+          playerAstronaut.root.rotation.y = Math.atan2(mx, mz);
+          const gait = Math.sin(animationTime * (pressedKeys.has('shift') ? 13 : 9));
+          if (!reducedMotion) {
+            playerAstronaut.limbs[2].rotation.x = gait * 0.48;
+            playerAstronaut.limbs[3].rotation.x = -gait * 0.48;
+            playerAstronaut.limbs[0].rotation.x = -gait * 0.27;
+            playerAstronaut.limbs[1].rotation.x = gait * 0.27;
+          }
+        } else {
+          playerAstronaut.limbs.forEach((limb: any) => { limb.rotation.x *= 0.78; limb.rotation.z *= 0.78; });
+        }
+        const groundY = destination === 'earth' ? 2.34 : insideHabitat ? 0.12 : terrainHeight(playerAstronaut.root.position.x, playerAstronaut.root.position.z, destination) + 0.12;
+        if (jumpVelocity !== 0 || playerAstronaut.root.position.y > groundY + 0.08) {
+          jumpVelocity -= 14.5 * dt;
+          playerAstronaut.root.position.y = Math.max(groundY, playerAstronaut.root.position.y + jumpVelocity * dt);
+          if (playerAstronaut.root.position.y <= groundY + 0.001) { playerAstronaut.root.position.y = groundY; jumpVelocity = 0; }
+        } else {
+          playerAstronaut.root.position.y = groundY + (length > 0.05 ? Math.abs(Math.sin(animationTime * 9)) * 0.035 : 0);
+        }
+        camera.setTarget(new B.Vector3(playerAstronaut.root.position.x, playerAstronaut.root.position.y + 2.05, playerAstronaut.root.position.z));
+        camera.radius = Math.max(11, Math.min(22, camera.radius));
+        nearbyInteractable = null;
+        let nearestDistance = Infinity;
+        for (const item of stationRecords) {
+          const distance = B.Vector3.Distance(playerAstronaut.root.position, item.position);
+          if (distance < item.radius && distance < nearestDistance) {
+            nearestDistance = distance;
+            nearbyInteractable = { id: item.id, title: item.title, description: item.description };
+          }
+        }
       }
-      astronautRoots.forEach((astronaut, index) => {
-        astronaut.root.position.y += Math.sin(animationTime * 2.1 + index) * 0.0018;
-        astronaut.limbs[0].rotation.z = Math.sin(animationTime * 1.3 + index) * 0.06;
-        astronaut.limbs[1].rotation.z = -Math.sin(animationTime * 1.3 + index) * 0.06;
-      });
-      if (roverMoving && roverRoot) {
+      if (vehicleMode && roverRoot) {
+        const keyForward = (pressedKeys.has('w') || pressedKeys.has('arrowup') ? 1 : 0) - (pressedKeys.has('s') || pressedKeys.has('arrowdown') ? 1 : 0);
+        const keyStrafe = (pressedKeys.has('d') || pressedKeys.has('arrowright') ? 1 : 0) - (pressedKeys.has('a') || pressedKeys.has('arrowleft') ? 1 : 0);
+        const fx = vehicleY + keyForward;
+        const sx = vehicleX + keyStrafe;
+        const length = Math.hypot(fx, sx);
+        if (length > 0.04) {
+          const speed = 8.2;
+          roverRoot.position.x += sx * speed * dt;
+          roverRoot.position.z += fx * speed * dt;
+          roverRoot.position.x = Math.max(-70, Math.min(70, roverRoot.position.x));
+          roverRoot.position.z = Math.max(-70, Math.min(70, roverRoot.position.z));
+          roverRoot.position.y = terrainHeight(roverRoot.position.x, roverRoot.position.z, destination) + 0.55;
+          roverRoot.rotation.y = Math.atan2(sx, fx);
+          roverWheels.forEach((wheel) => { wheel.rotation.x += length * dt * 2.8; });
+        }
+        camera.setTarget(new B.Vector3(roverRoot.position.x, roverRoot.position.y + 2.3, roverRoot.position.z));
+      }
+      if (!reducedMotion) {
+        if (destination === 'earth') {
+          const cloudLayer = scene.getMeshByName('earth-cloud-shell');
+          if (cloudLayer) cloudLayer.rotation.y += dt * 0.012;
+          const globe = scene.getMeshByName('planet-earth');
+          if (globe) globe.rotation.y += dt * 0.006;
+        }
+        astronautRoots.forEach((astronaut, index) => {
+          if (astronaut !== playerAstronaut || !playerControlled) {
+            astronaut.root.position.y += Math.sin(animationTime * 2.1 + index) * 0.0018;
+            astronaut.limbs[0].rotation.z = Math.sin(animationTime * 1.3 + index) * 0.06;
+            astronaut.limbs[1].rotation.z = -Math.sin(animationTime * 1.3 + index) * 0.06;
+          }
+        });
+        solarArrayRoots.forEach((array, index) => { array.rotation.y = Math.sin(animationTime * 0.12 + index * 1.8) * 0.11; });
+        if (sampleBeacon) {
+          sampleBeacon.rotation.y += dt * 0.5;
+          const lamp = scene.getMeshByName('sample-beacon-lamp');
+          if (lamp) lamp.scaling.setAll(1 + Math.sin(animationTime * 2.8) * 0.08);
+        }
+      }
+      if (roverMoving && roverRoot && !vehicleMode) {
         const direction = Math.sign(roverTargetX - roverRoot.position.x);
         roverRoot.position.x += direction * dt * 3.4;
         roverWheels.forEach((wheel) => { wheel.rotation.x += direction * dt * 1.4; });
@@ -719,19 +1058,36 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
     if (scene && !scene.isDisposed) scene.render();
   });
   const resizeHandler = (): void => engine.resize();
+  const keyDown = (event: KeyboardEvent): void => {
+    const target = event.target;
+    if (target instanceof HTMLElement && (target.isContentEditable || target.matches('input,textarea,select,[contenteditable="true"]'))) return;
+    const key = event.key.toLowerCase();
+    if (key === ' ' && playerControlled && !vehicleMode) {
+      event.preventDefault();
+      if (playerAstronaut && jumpVelocity === 0) jumpVelocity = 5.6;
+      return;
+    }
+    if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift'].includes(key)) {
+      pressedKeys.add(key);
+      if (playerControlled || vehicleMode) event.preventDefault();
+    }
+  };
+  const keyUp = (event: KeyboardEvent): void => { pressedKeys.delete(event.key.toLowerCase()); };
   window.addEventListener('resize', resizeHandler);
+  window.addEventListener('keydown', keyDown, { passive: false });
+  window.addEventListener('keyup', keyUp);
 
   return {
     get rendererName() { return rendererName; },
     setPlanet(destination: Planet) { journeyActive = false; rebuildScene(destination); },
-    setPaused(value: boolean) { paused = value; },
+    setPaused(value: boolean) { paused = value; if (dustSystem) { if (value || reducedMotion) dustSystem.stop(); else dustSystem.start(); } },
     setGraphicsQuality(value: GraphicsQuality) {
       quality = value;
       const ratio = value === 'low' ? 0.72 : value === 'medium' ? 1 : 1.25;
       engine.setHardwareScalingLevel(1 / ratio);
       if (value === 'low' && planet !== 'earth') rebuildScene(planet);
     },
-    setReducedMotion(value: boolean) { reducedMotion = value; },
+    setReducedMotion(value: boolean) { reducedMotion = value; if (dustSystem) { if (value || paused) dustSystem.stop(); else dustSystem.start(); } },
     setCameraMode(mode: CameraMode) {
       if (!camera) return;
       const targets: Record<CameraMode, { alpha: number; beta: number; radius: number; target: any }> = {
@@ -758,6 +1114,57 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
       roverTargetX = Math.max(-55, Math.min(55, roverRoot.position.x + Math.sign(direction) * 9));
       roverMoving = true;
     },
+    setPlayerControlled(enabled: boolean) {
+      playerControlled = enabled;
+      if (enabled && playerAstronaut && camera) {
+        camera.radius = 17;
+        camera.beta = 1.18;
+        camera.setTarget(new B.Vector3(playerAstronaut.root.position.x, playerAstronaut.root.position.y + 2, playerAstronaut.root.position.z));
+      }
+      if (!enabled) { joystickX = 0; joystickY = 0; pressedKeys.clear(); }
+    },
+    setJoystick(x: number, y: number) { joystickX = Math.max(-1, Math.min(1, x)); joystickY = Math.max(-1, Math.min(1, y)); },
+    jumpPlayer() { if (playerControlled && !vehicleMode && jumpVelocity === 0) jumpVelocity = 5.6; },
+    atSampleSite() { return Boolean(vehicleMode && roverRoot && sampleSitePosition && Math.hypot(roverRoot.position.x - sampleSitePosition.x, roverRoot.position.z - sampleSitePosition.z) <= 7.5); },
+    getNearbyInteractable() { return nearbyInteractable; },
+    interactNearest() { return nearbyInteractable; },
+    setVehicleMode(enabled: boolean) {
+      if (enabled && !roverDeployed && roverRoot) {
+        roverDeployed = true;
+        roverRoot.setEnabled(true);
+      }
+      vehicleMode = enabled;
+      if (playerAstronaut) playerAstronaut.root.setEnabled(!enabled);
+      if (camera) {
+        camera.radius = enabled ? 13 : 17;
+        const target = enabled && roverRoot ? roverRoot.position : playerAstronaut?.root.position;
+        if (target) camera.setTarget(new B.Vector3(target.x, target.y + 2, target.z));
+      }
+    },
+    setVehicleInput(x: number, y: number) { vehicleX = Math.max(-1, Math.min(1, x)); vehicleY = Math.max(-1, Math.min(1, y)); },
+    enterHabitat() {
+      if (!playerAstronaut) return;
+      insideHabitat = true;
+      jumpVelocity = 0;
+      playerAstronaut.root.position.set(49, 0.12, 47.8);
+      camera.radius = 14;
+      camera.setTarget(new B.Vector3(49, 2.2, 52));
+    },
+    exitHabitat() {
+      if (!playerAstronaut) return;
+      insideHabitat = false;
+      jumpVelocity = 0;
+      playerAstronaut.root.position.set(-8.5, terrainHeight(-8.5, 0, planet) + 0.12, 0);
+      camera.radius = 17;
+      camera.setTarget(new B.Vector3(-8.5, 2, 0));
+    },
+    focusStation(id: string) {
+      const station = stationRecords.find((item) => item.id === id);
+      if (station && camera) {
+        camera.setTarget(new B.Vector3(station.position.x, station.position.y + 2, station.position.z));
+        camera.radius = 12;
+      }
+    },
     playJourney(destination: Planet, onComplete?: () => void) {
       if (destination === 'earth') { rebuildScene('earth'); onComplete?.(); return; }
       if (!spacecraftRoot) spacecraftRoot = createSpacecraft(B, scene, 42, -32);
@@ -770,6 +1177,8 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
     },
     destroy() {
       window.removeEventListener('resize', resizeHandler);
+      window.removeEventListener('keydown', keyDown);
+      window.removeEventListener('keyup', keyUp);
       engine.stopRenderLoop();
       scene?.dispose();
       engine.dispose();

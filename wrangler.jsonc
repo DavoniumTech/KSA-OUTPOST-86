@@ -1,8 +1,43 @@
 {
-  "name": "ksa-outpost-86",
-  "compatibility_date": "2026-11-11",
-  "assets": {
-    "directory": "./dist",
-    "not_found_handling": "single-page-application"
-  }
+    "name":  "ksa-outpost-86",
+    "compatibility_date":  "2026-11-11",
+    "assets":  {
+                   "directory":  "./dist",
+                   "binding":  "ASSETS",
+                   "not_found_handling":  "single-page-application"
+               },
+    "main":  "./worker/index.js",
+    "workers_dev":  true,
+    "durable_objects":  {
+                            "bindings":  [
+                                             {
+                                                 "name":  "AUTH_INDEX",
+                                                 "class_name":  "AuthIndex"
+                                             },
+                                             {
+                                                 "name":  "PLAYER_DATA",
+                                                 "class_name":  "PlayerStore"
+                                             },
+                                             {
+                                                 "name":  "LIVE_ROOM",
+                                                 "class_name":  "LiveRoom"
+                                             }
+                                         ]
+                        },
+    "migrations":  [
+                       {
+                           "tag":  "v3.0.0",
+                           "new_sqlite_classes":  [
+                                                      "AuthIndex",
+                                                      "PlayerStore",
+                                                      "LiveRoom"
+                                                  ]
+                       }
+                   ],
+    "routes":  [
+                   {
+                       "pattern":  "ksa-outpost-86.davoniumtech.com/*",
+                       "zone_name":  "davoniumtech.com"
+                   }
+               ]
 }

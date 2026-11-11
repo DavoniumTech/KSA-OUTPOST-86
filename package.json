@@ -1,8 +1,8 @@
 {
   "name": "ksa-outpost-86",
   "private": true,
-  "version": "2.3.1",
-  "description": "KSA OUTPOST 86 \u2014 Orbital Frontier planetary exploration and junior astronaut outpost training simulator.",
+  "version": "3.0.0",
+  "description": "KSA OUTPOST 86 \u2014 Orbital Frontier interactive planetary adventure game.",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -11,7 +11,9 @@
     "build": "npm run typecheck && npm test && vite build",
     "preview": "vite preview --host 0.0.0.0"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@babylonjs/core": "9.35.0"
+  },
   "devDependencies": {
     "typescript": "5.9.3",
     "vite": "7.2.2"

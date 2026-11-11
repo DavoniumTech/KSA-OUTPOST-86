@@ -1,4 +1,4 @@
-import type { BabylonWorld, CameraMode, GraphicsQuality, Planet } from './babylonWorld';
+import type { BabylonWorld, CameraMode, GraphicsQuality, Planet, Interactable } from './babylonWorld';
 
 export function createCanvasFallback(canvas: HTMLCanvasElement, reducedMotion: boolean): BabylonWorld {
   const context = canvas.getContext('2d', { alpha: false });
@@ -9,6 +9,14 @@ export function createCanvasFallback(canvas: HTMLCanvasElement, reducedMotion: b
   let reduced = reducedMotion;
   let roverX = 0;
   let roverDeployed = false;
+  let playerControlled = false;
+  let vehicleMode = false;
+  let joystickX = 0;
+  let joystickY = 0;
+  let vehicleX = 0;
+  let playerX = 0;
+  let playerZ = 0;
+  let nearby: Interactable | null = null;
   let cameraMode: CameraMode = 'overview';
   let journeyStart = 0;
   let journeyTarget: Planet | null = null;
@@ -119,7 +127,8 @@ export function createCanvasFallback(canvas: HTMLCanvasElement, reducedMotion: b
       }
       return;
     }
-    if (!paused && !reduced) roverX += 0;
+    if (!paused && playerControlled && !vehicleMode) { playerX += joystickX * delta * 20; playerZ += joystickY * delta * 20; nearby = Math.hypot(playerX, playerZ) < 18 ? { id: 'command', title: 'Mission command', description: 'Open the command station.' } : null; }
+    if (!paused && vehicleMode) roverX = Math.max(-50, Math.min(50, roverX + vehicleX * delta * 18));
     drawScene(time / 1000, delta);
   };
 
@@ -214,6 +223,17 @@ export function createCanvasFallback(canvas: HTMLCanvasElement, reducedMotion: b
     setGraphicsQuality(value) { quality = value; resize(); },
     setReducedMotion(value) { reduced = value; },
     setCameraMode(value) { cameraMode = value; void cameraMode; },
+    setPlayerControlled(value) { playerControlled = value; },
+    setJoystick(x, y) { joystickX = Math.max(-1, Math.min(1, x)); joystickY = Math.max(-1, Math.min(1, y)); },
+    jumpPlayer() { if (playerControlled && !vehicleMode) playerZ = Math.max(-50, playerZ - 1.5); },
+    atSampleSite() { return vehicleMode && Math.abs(roverX + 31) < 8; },
+    getNearbyInteractable() { return nearby; },
+    interactNearest() { return nearby; },
+    setVehicleMode(value) { vehicleMode = value; },
+    setVehicleInput(x, _y) { vehicleX = Math.max(-1, Math.min(1, x)); },
+    enterHabitat() { playerX = 0; playerZ = 0; },
+    exitHabitat() { playerX = 0; playerZ = 0; },
+    focusStation(_id) { cameraMode = 'habitat'; },
     deployRover() { roverDeployed = true; roverX = Math.min(52, roverX + 16); },
     driveRover(direction) { if (roverDeployed) roverX = Math.max(-50, Math.min(50, roverX + Math.sign(direction) * 9)); },
     playJourney(destination, onComplete) { if (reduced) { planet = destination; onComplete?.(); return; } journeyTarget = destination; journeyStart = performance.now(); journeyCallback = onComplete; paused = false; },
