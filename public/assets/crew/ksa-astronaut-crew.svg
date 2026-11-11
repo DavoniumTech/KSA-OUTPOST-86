@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 440" role="img" aria-labelledby="title desc">
+<title id="title">KSA lunar astronaut training suit</title><desc id="desc">An original stylised astronaut in a white lunar exploration suit, gold details and a dark reflective visor.</desc>
+<defs>
+ <linearGradient id="suit" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".48" stop-color="#bbc7d1"/><stop offset="1" stop-color="#677887"/></linearGradient>
+ <linearGradient id="visor" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#88c6d8"/><stop offset=".27" stop-color="#24465c"/><stop offset=".68" stop-color="#071521"/><stop offset="1" stop-color="#02080f"/></linearGradient>
+ <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd28b"/><stop offset="1" stop-color="#a85f26"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#78a9c5" stop-opacity=".33"/><stop offset="1" stop-color="#78a9c5" stop-opacity="0"/></radialGradient>
+ <filter id="shadow"><feGaussianBlur stdDeviation="8"/></filter>
+</defs>
+<ellipse cx="180" cy="414" rx="98" ry="14" fill="#000" opacity=".45" filter="url(#shadow)"/>
+<circle cx="180" cy="198" r="182" fill="url(#glow)"/>
+<!-- backpack -->
+<g class="pack"><path d="M109 174Q91 164 88 189L87 282Q92 300 119 294L134 276V190Z" fill="#647788" stroke="#c8d4dc" stroke-width="5"/><path d="M100 197h24v75h-25z" fill="#14283a"/><path d="M104 210h15M104 225h15M104 240h15" stroke="#e8a95e" stroke-width="3"/></g>
+<!-- legs -->
+<g class="leg leg-left"><path d="M139 283Q128 313 124 368L132 389L170 391L174 371L170 304Z" fill="url(#suit)" stroke="#536677" stroke-width="4"/><path d="M127 366L121 395Q125 410 170 410L180 398L169 376Z" fill="#35495a" stroke="#9aabb7" stroke-width="4"/><path d="M137 388h29" stroke="url(#gold)" stroke-width="5"/></g>
+<g class="leg leg-right"><path d="M190 302L188 369L198 392L235 389L242 367Q235 314 218 282Z" fill="url(#suit)" stroke="#536677" stroke-width="4"/><path d="M195 376L186 399Q194 414 238 410L247 394L237 369Z" fill="#35495a" stroke="#9aabb7" stroke-width="4"/><path d="M201 389h30" stroke="url(#gold)" stroke-width="5"/></g>
+<!-- torso -->
+<path d="M129 161Q144 145 180 147Q217 145 231 164L245 270Q231 293 180 296Q131 293 115 270Z" fill="url(#suit)" stroke="#607384" stroke-width="5"/>
+<path d="M145 177Q180 187 215 177L221 265Q180 282 139 265Z" fill="#dce4e9" opacity=".7"/>
+<path d="M149 196h62v50h-62z" rx="5" fill="#1a3042" stroke="#91a6b5" stroke-width="3"/>
+<path d="M157 205h46v7h-46z" fill="url(#gold)"/><circle cx="165" cy="230" r="7" fill="#75c49b"/><circle cx="186" cy="230" r="7" fill="#efa34e"/><path d="M157 242h46" stroke="#8fa8b8" stroke-width="3"/>
+<path d="M137 167L120 185M223 167l17 18" stroke="#eef3f6" stroke-width="8"/>
+<!-- arms -->
+<g class="arm arm-left"><path d="M123 176Q99 190 93 237L100 256L121 255L140 202Z" fill="url(#suit)" stroke="#617384" stroke-width="5"/><path d="M92 237L83 269Q89 284 112 280L126 264L119 246Z" fill="#34495a" stroke="#a3b3be" stroke-width="4"/><path d="M90 258h27" stroke="url(#gold)" stroke-width="4"/></g>
+<g class="arm arm-right"><path d="M237 177Q260 192 266 236L256 256L234 254L218 202Z" fill="url(#suit)" stroke="#617384" stroke-width="5"/><path d="M266 236L276 267Q269 284 247 280L233 264L240 246Z" fill="#34495a" stroke="#a3b3be" stroke-width="4"/><path d="M244 258h27" stroke="url(#gold)" stroke-width="4"/></g>
+<!-- helmet and neck ring -->
+<path d="M145 145Q180 128 215 145L218 165Q180 182 142 165Z" fill="#7e8e9b" stroke="#e5edf1" stroke-width="5"/>
+<ellipse cx="180" cy="95" rx="65" ry="72" fill="url(#suit)" stroke="#e1e9ed" stroke-width="7"/>
+<ellipse cx="180" cy="96" rx="52" ry="56" fill="url(#visor)" stroke="url(#gold)" stroke-width="6"/>
+<path d="M148 73Q168 46 207 55Q174 67 161 95Q154 111 152 125Q139 101 148 73Z" fill="#c6f2ff" opacity=".23"/>
+<path d="M193 55Q219 75 219 104" fill="none" stroke="#a7e3f5" stroke-width="4" opacity=".25"/>
+<path d="M147 145h66" stroke="url(#gold)" stroke-width="5"/>
+<circle cx="118" cy="181" r="5" fill="#efa34e"/><circle cx="242" cy="181" r="5" fill="#efa34e"/>
+<text x="180" y="344" fill="#f0b76f" font-family="monospace" font-size="11" text-anchor="middle" letter-spacing="3">KSA · CREW 086</text>
+</svg>
