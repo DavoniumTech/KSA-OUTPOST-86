@@ -50,7 +50,7 @@ export function answerMissionQuestion(
   const context = `DAY ${state.day} / 7 · ${nearest ? `NEAR ${nearest.title.toUpperCase()}` : 'NO STATION IN RANGE'} · OFFLINE KNOWLEDGE`;
 
   if (!query) {
-    return { answer: 'Type a question about your objective, power, life support, water, the shelter, the greenhouse or the lunar science activity.', context };
+    return { answer: 'Type a question about your objective, power, life support, water, the shelter, greenhouse, rover operations, Earth departure or Mars expedition.', context };
   }
 
   if (containsAny(query, ['what should i do here', 'what do i do here', 'help me here', 'this station', 'near me', 'what now'])) {
@@ -113,21 +113,21 @@ export function answerMissionQuestion(
 
   if (containsAny(query, ['rover', 'robot', 'drive'])) {
     return {
-      answer: 'A rover model is present in the lunar scene, but rover driving and robotic operations are not implemented in this archive. You can inspect the outpost and complete its existing station interactions; I will not claim the rover is controllable.',
+      answer: 'KSA OUTPOST 86 now includes a rover deployment and simplified left/right surface-drive interaction in the planetary scene. The current training route is a visual mobility exercise, not a validated terrain-navigation or robotics model.',
       context,
     };
   }
 
   if (containsAny(query, ['mars', 'earth', 'launch', 'spacecraft', 'rocket', 'flight', 'landing'])) {
     return {
-      answer: 'This archive currently contains one playable lunar outpost mission. It does not yet contain a playable Earth launch sequence, spacecraft flight, lunar landing sequence or Mars environment. The distant Earth is decorative scene geometry, not an explorable destination.',
+      answer: 'Orbital Frontier includes Earth as the departure scene, a skippable cinematic transit to the selected destination, and separate Moon and Mars training environments. The travel sequence is an educational visualisation, not a validated interplanetary trajectory or spacecraft flight model.',
       context,
     };
   }
 
   if (containsAny(query, ['astronaut', 'crew', 'team', 'suit'])) {
     return {
-      answer: 'The current 3D mission has one playable, procedurally modelled astronaut. A separate companion panel contains an animated astronaut illustration, but the project does not yet have a four-to-six-member animated 3D crew.',
+      answer: 'The planetary environment now contains a small procedural crew group, while the Crew module presents four fictional specialists with role, proficiency and assignment information. Crew profiles are training characters, not real astronauts.',
       context,
     };
   }
@@ -154,7 +154,7 @@ export function answerMissionQuestion(
   }
 
   return {
-    answer: 'I do not have a verified answer for that question in the offline project knowledge base. Try asking about the current objective, power, oxygen, cabin air, water recovery, the radiation shelter, greenhouse, lunar survey or the limits of this simulation.',
+    answer: 'I do not have a verified answer for that question in the offline project knowledge base. Try asking about the current objective, power, oxygen, cabin air, water recovery, radiation shelter, greenhouse, rover operations, Earth departure, Mars or the limits of this simulation.',
     context,
   };
 }

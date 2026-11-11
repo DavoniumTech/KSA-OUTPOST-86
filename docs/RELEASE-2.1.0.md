@@ -66,3 +66,8 @@ The public GitHub repository page was checked on 11 November 2026 and displayed 
 ## Deployment
 
 On Windows PowerShell, extract the ZIP, open PowerShell in the project folder, run `npm ci`, then `npm run dev`. After confirming local gameplay, run `npm run typecheck`, `npm test` and `npm run build`. The supplied deployment guide explains GitHub Pages and Cloudflare Pages settings. Inspect the actual remote branch before any push; never force-push to reconcile an unknown history.
+
+
+## Repository-status correction — 11 November 2026
+
+The earlier statement in this release note that the public GitHub repository was empty is superseded. A fresh public repository page check on 11 November 2026 showed a `main` branch, file tree and four commits. The uploaded project ZIP does not contain `.git` history, and the remote source-file contents could not be retrieved for a comparison in that environment. No authenticated push or deployment was performed. See the 2.2.0 release note for the current audit and repository-status details.

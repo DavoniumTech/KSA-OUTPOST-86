@@ -1,19 +1,14 @@
 {
-  "name": "KSA OUTPOST 86",
-  "short_name": "OUTPOST 86",
-  "description": "Build. Survive. Explore. A student lunar outpost training mission.",
+  "name": "KSA OUTPOST 86 — Orbital Frontier",
+  "short_name": "Outpost 86",
+  "description": "Explore Earth, the Moon and Mars through an interactive planetary outpost training simulation.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#08111e",
-  "theme_color": "#08111e",
   "orientation": "any",
+  "background_color": "#f3efe6",
+  "theme_color": "#f3efe6",
   "icons": [
-    {
-      "src": "./favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }

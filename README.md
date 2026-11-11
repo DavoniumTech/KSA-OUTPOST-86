@@ -1,176 +1,87 @@
-# KSA OUTPOST 86
+# KSA OUTPOST 86 — ORBITAL FRONTIER
 
-**BUILD. SURVIVE. EXPLORE.**
+**EXPLORE. BUILD. SURVIVE. DISCOVER.**
 
-A browser-based, three-dimensional lunar outpost training mission created as a KSA student educational project for the NASA Space Apps Challenge 2026 challenge **“Build a Junior Astronaut Mission Trainer.”**
+KSA OUTPOST 86 is an independent educational planetary exploration and outpost-management simulator. This v2.3.0 reconstruction expands the supplied lunar training project into an Earth–Moon–Mars experience with a seven-day Martian campaign, a Babylon.js 3D world layer, a responsive Android-style interface and a 2D fallback.
 
-> KSA OUTPOST 86 is a fictional educational simulation. NASA has not endorsed, certified or approved this application. Its numerical meters and events are training values, not NASA engineering specifications or operational guidance.
+> **Educational notice:** This is a fictional training simulation. NASA has not endorsed, certified or approved the application. Resource meters, mission events and vehicle behaviour are simplified educational models, not operational spacecraft specifications, medical guidance or live NASA telemetry.
 
-## What is included
+## What changed in v2.3.0
 
-- A live 3D lunar training site rendered by the standalone PlayCanvas Engine.
-- A procedural, articulated astronaut character with manually animated walking and idle motion.
-- A 64 × 64 procedural lunar height-field with low-relief crater basins, outer-site undulation, terrain rocks, long-shadow lighting, habitat modules, solar arrays, greenhouse, water-recovery equipment, shelter, rover, communications mast and science marker.
-- Third-person camera follow, keyboard movement, mouse-look and Android touch joystick/look controls.
-- Seven-day deterministic mission progression with fixed, testable events.
-- Interactive power, life-support, water-recovery, radiation-shelter, greenhouse and science stations.
-- Cause-and-effect training values for power, oxygen supply, cabin-air condition, CO₂-control condition, water, food, thermal condition and crew operational readiness.
-- Mission log, objective tracking, pause screen, mission debrief and validated local save/continue.
-- KSA Mission Control offline assistant: answers common training questions using the live mission day, objective, resource indicators and nearby station.
-- Bundled interface, radio, warning, success, suit-breathing and ambience sounds, with user-gesture audio unlock and saved audio preferences.
-- Companion field-systems panel with crew illustration, visual terrain-layer scanner and audio controls.
-- Responsive menu, briefing, how-to-play, settings, science sources and limitations screens.
-- A basic service worker for same-origin application-shell/runtime asset caching after the first successful visit.
+- Replaced the previous dark, box-heavy application shell with a warm ivory, sand, copper and terracotta visual system.
+- Added a fixed top app bar and adaptive fixed mobile bottom navigation.
+- Added Earth, Moon and Mars destination selection and distinct procedural environments.
+- Added a Babylon.js rendering layer with WebGPU preference and WebGL fallback.
+- Added a 2D Canvas fallback so the core interface remains accessible if Babylon.js cannot load or WebGL is unavailable.
+- Added animated spacecraft transit, a habitat complex, astronauts, solar equipment and rover scene elements.
+- Added a seven-day Mars expedition with resource management, events, crew readiness, rover sampling and a final assessment.
+- Preserved the deterministic First Light lunar mission, existing save system, offline Mission Control helper, Lunar Lander Lab, audio controls, PWA and existing Cloudflare/GitHub deployment configuration.
 
-## Challenge connection
+## Existing systems retained
 
-The challenge asks students to operate a lunar or Martian outpost and experience decisions involving life support, radiation shielding, power and food production. KSA OUTPOST 86 turns those trade-offs into a short interactive training mission: the player explores the site, operates equipment, responds to events and reviews the consequences.
+The lunar First Light campaign, its power/life-support/water/radiation/greenhouse/science decisions, the local mission save, the deterministic Mission Control knowledge helper and the independent Lunar Lander Lab remain part of the application. Existing storage keys are retained where practical. Mars state uses a separate versioned key.
 
-## Current destination scope
+## Technology and rendering
 
-This release is a playable lunar outpost training mission. It does **not** yet include playable Earth launch operations, a spacecraft flight/landing sequence, a Mars world, a controllable rover, or a multi-person animated 3D crew. The distant Earth sphere and rover are scene elements, not playable systems. These limits are stated in the offline assistant and `docs/LIMITATIONS.md` so the demonstration does not overclaim.
+- Vite 7.2.x and TypeScript 5.9.x.
+- Babylon.js runtime, loaded from the official Babylon.js CDN at runtime.
+- WebGPU is attempted where supported; WebGL is the fallback.
+- A Canvas 2D planetary fallback is included.
+- Node's built-in test runner.
+- Browser-local mission persistence.
 
-The Mission Control assistant is a deterministic offline knowledge helper, not a generative language model. It cannot browse, call NASA APIs or issue real spacecraft commands.
+**Network limitation:** Babylon.js is loaded from `https://cdn.babylonjs.com/babylon.js`; it is not bundled in this source archive. The container used to prepare this release could not resolve the npm registry or GitHub, so a local Babylon package could not be installed. The application falls back to the included Canvas 2D world if the CDN is unreachable. That fallback is not equivalent to the Babylon 3D renderer. The first successful Babylon launch therefore requires access to the official CDN.
 
-## Technology
-
-- PlayCanvas Engine `2.24.0` (standalone NPM runtime)
-- TypeScript `5.9.x`
-- Vite `7.x`
-- Node.js built-in test runner (no test framework dependency)
-- HTML and CSS
-- WebGL 2 baseline
-- Local browser storage for settings and mission progress
-
-The supplied `package-lock.json` pins the dependency tree. Use `npm ci` for a reproducible install. The game does not need an external API key, account, paid service or cloud AI service.
+The planetary terrain, Earth surface and scene props in this release are procedurally generated for the simulation. They are not a claim of photogrammetric or measured NASA terrain. Existing archive imagery was not re-labelled as NASA data because its original provenance could not be independently confirmed.
 
 ## Requirements
 
-- Node.js 22.16+ recommended (the built-in test command uses Node's TypeScript type-stripping support).
+- Node.js 22.16 or newer.
 - npm.
-- A modern browser with WebGL 2 support. Desktop Chrome/Edge and Android Chrome are the initial targets.
+- A modern browser. WebGL 2 is recommended; WebGPU is used where available.
 
-## Install and run
-
-Open PowerShell in the extracted project folder:
+## Install and build
 
 ```powershell
 npm ci
-npm run dev
-```
-
-Vite prints a local address, normally `http://localhost:5173`. Open that address in the browser. The development server can also print a LAN address for testing on a phone connected to the same Wi-Fi network.
-
-## Controls
-
-| Action | Desktop | Touchscreen |
-|---|---|---|
-| Move | W A S D or arrow keys | Virtual joystick |
-| Look around | Drag on the 3D scene | Drag on the 3D scene |
-| Interact | E | Tap INTERACT when a station is in range |
-| Pause / close panel | Escape | Pause button / close button |
-| Complete day | Complete Day button after objective | Complete Day button after objective |
-
-On mobile, landscape gives the most space for the 3D view, but the interface also rearranges for narrow portrait screens.
-
-## Mission outline
-
-| Day | Training event or task |
-|---|---|
-| 1 | Inspect power and life-support systems |
-| 2 | Respond to reduced sunlight and choose a power plan |
-| 3 | Repair the water-recovery unit or conserve water |
-| 4 | Respond to a solar-radiation warning and secure the shelter |
-| 5 | Choose a greenhouse growth or conservation schedule |
-| 6 | Complete a marked regolith survey |
-| 7 | Run the final systems assessment |
-
-The fixed progression is deliberate: identical choices produce repeatable simulation results, which helps classroom discussion and automated tests.
-
-## Quality checks
-
-```powershell
 npm run typecheck
 npm test
 npm run build
 ```
 
-`npm run build` runs type checking, unit tests and then the Vite production build. The current archive includes 23 automated tests across the mission simulation, local storage and offline assistant. The PlayCanvas/Vite production build and browser smoke tests have not been run because dependency installation did not complete in this environment; see `docs/TESTING.md` for the exact verification record. A successful build is not the same as testing on every phone or browser.
+`npm run build` invokes type checking, unit tests and the Vite production build. The build and tests should be run in a network-enabled environment where the locked Vite dependencies are installed. The release-preparation container ran TypeScript and the Node test suite, but could not run Vite's production bundler because dependencies were not installed and outbound package-network access was unavailable. See `docs/TECHNICAL-REPORT-2.3.0.md`.
 
-## Save data
-
-The mission and preferences are stored locally in the browser using `localStorage`. There is no account, cloud save or personal-information collection. Clearing browser site data can remove saved progress. Use the in-game save control before closing the browser.
-
-## Project structure
-
-```text
-KSA-OUTPOST-86/
-├── index.html
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-├── public/
-│   ├── favicon.svg
-│   ├── manifest.webmanifest
-│   ├── sw.js
-│   └── assets/branding/       # Replaceable KSA logo location
-├── src/
-│   ├── main.ts                # App startup and UI/game orchestration
-│   ├── engine/createWorld.ts  # PlayCanvas scene, astronaut, camera, controls
-│   ├── game/simulation.ts     # Deterministic resource and mission model
-│   ├── game/assistant.ts      # Local context-aware mission knowledge assistant
-│   ├── game/storage.ts        # Local save and settings
-│   ├── ui/ui.ts               # Screens, HUD and equipment panels
-│   └── styles.css             # Responsive visual system
-├── tests/simulation.test.mjs
-├── tests/storage.test.mjs
-├── tests/assistant.test.mjs
-├── docs/
-└── scripts/push-ksa-outpost-86.ps1
-```
-
-## Production build
+For the Cloudflare Workers asset build, retain the repository's existing build convention:
 
 ```powershell
+$env:WORKERS_CI = '1'
 npm run build
-npm run preview
 ```
 
-The deployable site is generated in `dist/`. Do not edit the generated `dist/` files; edit the source in `src/` and build again.
+The normal GitHub Pages build retains the `/KSA-OUTPOST-86/` base path. Do not change the existing hosting configuration without checking the real production integration.
 
-## GitHub and Cloudflare Pages
+## Controls and navigation
 
-The intended repository is `https://github.com/DavoniumTech/KSA-OUTPOST-86.git`, with production branch `main`. Its public GitHub page was checked on 11 November 2026 and displayed “This repository is empty”. No authenticated repository write, push or deployment has been performed. The included script handles an empty remote by creating the initial `main` branch.
+The application provides Home, Missions, Planets, Outpost, Crew and Explore sections, with Science, Journal, Settings and Lunar Lander Lab available through the additional navigation menu. Planet selection changes the rendered environment. Mission operations and rover actions update the relevant simulation state. Reduced-motion and graphics settings are available in Settings.
 
-A safety-first PowerShell helper is included at `scripts/push-ksa-outpost-86.ps1`. It asks for the ZIP and workspace paths, verifies the remote, checks the working tree and runs install/typecheck/tests/build before pushing. It intentionally stops if it finds a non-empty or divergent remote that needs human reconciliation rather than overwriting it.
+## Data and privacy
 
-For Cloudflare Pages, connect the GitHub repository and set:
+Mission progress and settings are stored locally in the current browser. The supplied project does not configure accounts or a cross-device backend, so local saves do not synchronize across devices. The core game does not require a NASA API key or cloud AI service. The Mission Control helper is deterministic and offline; it is not a generative AI connection.
 
-| Setting | Value |
-|---|---|
-| Project name | `ksa-outpost-86` |
-| Production branch | `main` |
-| Root directory | `/` |
-| Framework preset | `Vite` if listed; otherwise `Other` |
-| Build command | `npm run build` |
-| Build output directory | `dist` |
-| Environment variables | None required |
+## Deployment
 
-See `docs/DEPLOYMENT.md` for the step-by-step setup. No Cloudflare deployment has been performed or verified from this environment.
+The target repository is `https://github.com/DavoniumTech/KSA-OUTPOST-86.git`, branch `main`. The included `scripts/Deploy-To-GitHubMain.ps1` supports a safe package overlay and direct push. The bootstrap command should be copied from the release delivery instructions. It requires Git authentication and permission to push to `main`, and it refuses a dirty working tree, incorrect remote, non-main branch or non-fast-forward update.
 
-## Science and attribution
+The existing `wrangler.jsonc`, `.github` workflows, `wrangler.toml`, `.env*` and `.dev.vars*` are deliberately protected by the deployment script. The supplied GitHub Actions workflow deploys GitHub Pages; it is not evidence that Cloudflare is connected. Cloudflare deployment depends on the project's existing authenticated integration/configuration and must be verified separately. A successful Git push alone is not proof of a Cloudflare deployment.
 
-See:
+## Science and asset references
 
-- `docs/SCIENCE.md` for the source-based explanations and training-model boundaries.
-- `docs/ASSETS.md` for the bundled asset inventory and attribution.
-- `docs/GAMEPLAY.md` for the objective sequence and interactions.
-- `docs/LIMITATIONS.md` for incomplete features and known simplifications.
-- `docs/TESTING.md` for checks and acceptance status.
-- `docs/ARCHITECTURE.md` for the runtime structure and data flow.
-- `docs/DEMONSTRATION.md` for a short judge-facing demonstration route.
-- `docs/RELEASE-2.1.0.md` for changes and remaining scope.
+- [NASA Science](https://science.nasa.gov/)
+- [NASA Eyes](https://science.nasa.gov/eyes/)
+- [NASA 3D Resources](https://science.nasa.gov/3d-resources/)
+- [NASA Solar System Treks](https://trek.nasa.gov/)
+- [NASA API portal](https://api.nasa.gov/)
+- [Babylon.js](https://www.babylonjs.com/)
+- [Babylon.js documentation](https://doc.babylonjs.com/)
 
-## Official challenge reference
-
-https://www.spaceappschallenge.org/2026/challenges/junior-astronaut-mission-trainer/
+These are references for learning and future data/asset integration. This release does not claim that all visual assets or planetary elevations are NASA-sourced. Review `docs/ASSETS.md`, `docs/SCIENCE.md` and `docs/LIMITATIONS.md`.

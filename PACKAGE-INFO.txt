@@ -1,0 +1,13 @@
+KSA OUTPOST 86 — ORBITAL FRONTIER v2.3.0
+
+This archive contains the rebuilt application source. It is designed to overlay the existing DavoniumTech/KSA-OUTPOST-86 repository.
+
+Important:
+- Preserve the existing .git directory and main branch.
+- The included scripts/Deploy-To-GitHubMain.ps1 performs a guarded direct-to-main overlay/push.
+- The deployment helper preserves .github, wrangler.jsonc, wrangler.toml, .env*, and .dev.vars* from the target repository.
+- It refuses an incorrect remote, dirty working tree, non-main branch or non-fast-forward update.
+- Babylon.js is loaded from its official CDN at runtime. See README.md and docs/LIMITATIONS.md.
+- TypeScript check passed and 39 unit tests passed in the release container.
+- A Vite production build was not run because dependencies/network access were unavailable in the release container.
+- No GitHub or Cloudflare deployment is claimed as complete.

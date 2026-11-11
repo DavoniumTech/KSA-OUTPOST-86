@@ -1,73 +1,32 @@
-# Deployment Guide — Windows, GitHub Pages and Cloudflare
+# Deployment notes — v2.3.0
 
-## 1. Extract and run locally
+## Existing production configuration
 
-Install Node.js 22.16 or later and Git for Windows. In PowerShell, use the folder where you saved the ZIP:
+This project retains its Vite `dist` output and existing base-path behaviour:
+
+- GitHub Pages uses `/KSA-OUTPOST-86/`.
+- A Cloudflare Workers asset build can use root base `/` when `WORKERS_CI=1`.
+- `wrangler.jsonc` remains the existing static-assets configuration.
+- `.github/workflows/deploy.yml` remains untouched; in the supplied baseline it deploys GitHub Pages, not Cloudflare.
+
+Do not infer a Cloudflare Git integration from the presence of `wrangler.jsonc`. Verify the real Cloudflare account/project settings before claiming an automatic production deployment.
+
+## Build commands
 
 ```powershell
-$Project = Join-Path $HOME 'Downloads\KSA-OUTPOST-86'
-New-Item -ItemType Directory -Force -Path $Project | Out-Null
-Expand-Archive -LiteralPath (Join-Path $HOME 'Downloads\KSA-OUTPOST-86-2.1.0.zip') -DestinationPath $Project -Force
-Set-Location $Project
 npm ci
-npm run dev
-```
-
-Open the local URL printed by Vite (normally `http://localhost:5173`). Keep PowerShell open while testing. To test on an Android phone on the same Wi-Fi network, open the LAN URL printed by Vite.
-
-Before deploying, run:
-
-```powershell
-npm run typecheck
-npm test
 npm run build
 ```
 
-Do not proceed to deployment unless all three commands finish successfully. The current working environment did not complete `npm ci`, so the production build has not been independently verified in this update.
-
-## 2. GitHub Pages
-
-The repository includes `.github/workflows/deploy.yml`. After the project source is pushed to the `main` branch:
-
-1. Open the GitHub repository's **Settings → Pages**.
-2. Set the build/deployment source to **GitHub Actions**.
-3. Confirm the repository's Actions workflow is enabled.
-4. Push a reviewed commit to `main`, or run **Deploy KSA OUTPOST 86** through the Actions tab.
-5. Wait for the workflow to finish successfully, then open the published Pages URL.
-6. Test the menu, mission entry, assistant, interactions and save/continue on the hosted site.
-
-The Vite configuration uses `/KSA-OUTPOST-86/` as the production base path for the GitHub Pages project URL. If the repository is renamed or hosted at a custom root domain, revisit `vite.config.ts` before rebuilding.
-
-## 3. Cloudflare Pages
-
-The application can also be built for a root-hosted static site. In the Cloudflare Pages project settings, set `WORKERS_CI` to `1` as a **build environment variable** so Vite uses `/` as its base path.
-
-| Setting | Value |
-|---|---|
-| Framework preset | Vite (or Other) |
-| Build command | `npm run build` |
-| Build output directory | `dist` |
-| Root directory | `/` |
-| Build environment variable | `WORKERS_CI=1` |
-| Runtime secrets | None required |
-
-Connect the intended GitHub repository and choose `main` as the production branch. Deploy only after the GitHub repository and workflow state have been checked. After the first successful Pages deployment, open the generated `*.pages.dev` URL and validate it before attaching a custom domain.
-
-## 4. Cloudflare Worker static assets
-
-The archive includes `wrangler.jsonc`, which serves the `dist/` directory as Worker static assets. With Wrangler installed and authenticated, build with `WORKERS_CI=1` and deploy using Wrangler:
+For the Workers root-path build:
 
 ```powershell
 $env:WORKERS_CI = '1'
 npm run build
-npx wrangler deploy
-Remove-Item Env:WORKERS_CI
 ```
 
-This is a separate deployment target from Cloudflare Pages. It has not been deployed or validated from this environment. Confirm the target Cloudflare account and Worker name in the dashboard before deployment; do not assume it is the same service as Pages.
+## Safe GitHub main deployment
 
-## 5. Safe GitHub push helper
+`scripts/Deploy-To-GitHubMain.ps1` accepts `-PackageRoot` and `-RepoRoot`. It checks the expected repository remote, requires a clean working tree and the currently checked-out `main` branch, verifies remote `main`, fast-forwards, overlays the package while preserving `.git`, `.github`, Cloudflare configuration and secrets, commits changes and pushes directly to `origin main`. It does not create a PR, branch or force-push.
 
-`scripts/push-ksa-outpost-86.ps1` is a guarded convenience script. It does not force-push, but it can create a commit and push after you explicitly type `COPY` and `PUSH`. Read the script before executing it. It stops if the remote contains existing commits or the local history diverges. If it stops, compare and reconcile the repository histories manually; do not delete remote files or force-push to make the script continue.
-
-The ZIP does not include `.git` metadata. GitHub's actual branch history must therefore be checked from an authenticated local checkout immediately before any write. The archive itself is not evidence of the remote's current state.
+A successful push confirms GitHub accepted the commit. It does not, by itself, prove that a Cloudflare deployment completed.

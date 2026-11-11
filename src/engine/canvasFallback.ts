@@ -1,0 +1,222 @@
+import type { BabylonWorld, CameraMode, GraphicsQuality, Planet } from './babylonWorld';
+
+export function createCanvasFallback(canvas: HTMLCanvasElement, reducedMotion: boolean): BabylonWorld {
+  const context = canvas.getContext('2d', { alpha: false });
+  if (!context) throw new Error('Neither Babylon.js nor the 2D canvas fallback could initialise.');
+  let planet: Planet = 'mars';
+  let quality: GraphicsQuality = 'medium';
+  let paused = false;
+  let reduced = reducedMotion;
+  let roverX = 0;
+  let roverDeployed = false;
+  let cameraMode: CameraMode = 'overview';
+  let journeyStart = 0;
+  let journeyTarget: Planet | null = null;
+  let journeyCallback: (() => void) | undefined;
+  let frame = 0;
+  let lastTime = 0;
+  let width = 1;
+  let height = 1;
+  let ratio = 1;
+  const stars = Array.from({ length: 110 }, (_, index) => ({ x: ((index * 83) % 997) / 997, y: ((index * 137) % 701) / 701, r: 0.4 + (index % 4) * 0.25 }));
+
+  const resize = (): void => {
+    ratio = Math.min(window.devicePixelRatio || 1, quality === 'low' ? 1 : quality === 'medium' ? 1.4 : 1.8);
+    width = Math.max(1, canvas.clientWidth);
+    height = Math.max(1, canvas.clientHeight);
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  };
+
+  const terrain = (y: number, colour: string, offset: number): void => {
+    context.beginPath();
+    context.moveTo(0, height);
+    for (let x = 0; x <= width + 8; x += 8) {
+      const variation = Math.sin(x * 0.009 + offset) * 21 + Math.sin(x * 0.022 + offset * 1.7) * 11 + Math.cos(x * 0.004 + offset) * 17;
+      context.lineTo(x, y + variation);
+    }
+    context.lineTo(width, height);
+    context.closePath();
+    context.fillStyle = colour;
+    context.fill();
+  };
+
+  const drawHabitat = (x: number, y: number, scale: number): void => {
+    context.save();
+    context.translate(x, y);
+    context.scale(scale, scale);
+    context.fillStyle = '#c9bda7';
+    context.strokeStyle = 'rgba(56,57,52,.7)';
+    context.lineWidth = 2;
+    context.beginPath();
+    context.roundRect(-51, -23, 102, 38, 14);
+    context.fill();
+    context.stroke();
+    context.fillStyle = '#74a2a9';
+    context.beginPath();
+    context.ellipse(0, -26, 24, 20, 0, Math.PI, Math.PI * 2);
+    context.fill();
+    context.stroke();
+    context.fillStyle = '#98714e';
+    context.fillRect(-67, -5, 16, 16);
+    context.fillRect(51, -5, 16, 16);
+    context.strokeStyle = '#52585a';
+    context.lineWidth = 3;
+    context.beginPath();
+    context.moveTo(-20, 14); context.lineTo(-25, 29);
+    context.moveTo(20, 14); context.lineTo(25, 29);
+    context.stroke();
+    context.restore();
+  };
+
+  const drawRover = (x: number, y: number, scale: number): void => {
+    context.save();
+    context.translate(x, y);
+    context.scale(scale, scale);
+    context.fillStyle = '#d4d0c5';
+    context.fillRect(-35, -27, 70, 30);
+    context.fillStyle = '#3b4649';
+    for (const wheelX of [-25, 0, 25]) {
+      context.beginPath(); context.arc(wheelX - 10, 9, 10, 0, Math.PI * 2); context.fill();
+      context.beginPath(); context.arc(wheelX + 10, 9, 10, 0, Math.PI * 2); context.fill();
+    }
+    context.fillStyle = '#8b9ca0';
+    context.fillRect(9, -48, 4, 22);
+    context.beginPath(); context.arc(11, -53, 8, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = '#bf986a'; context.lineWidth = 2;
+    context.beginPath(); context.moveTo(-20, -25); context.lineTo(-5, -41); context.lineTo(8, -41); context.stroke();
+    context.restore();
+  };
+
+  const drawAstronaut = (x: number, y: number, scale: number, accent: string): void => {
+    context.save();
+    context.translate(x, y);
+    context.scale(scale, scale);
+    context.fillStyle = '#eee6d7';
+    context.beginPath(); context.roundRect(-11, -37, 22, 31, 9); context.fill();
+    context.fillStyle = accent; context.fillRect(-15, -26, 30, 8);
+    context.fillStyle = '#d6cbb9'; context.beginPath(); context.arc(0, -47, 13, 0, Math.PI * 2); context.fill();
+    context.fillStyle = '#35525f'; context.beginPath(); context.ellipse(0, -47, 9, 7, 0, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = '#eee6d7'; context.lineWidth = 7; context.lineCap = 'round';
+    context.beginPath(); context.moveTo(-8, -9); context.lineTo(-11, 9); context.moveTo(8, -9); context.lineTo(11, 9); context.stroke();
+    context.restore();
+  };
+
+  const drawFrame = (time: number): void => {
+    frame = requestAnimationFrame(drawFrame);
+    if (!lastTime) lastTime = time;
+    const delta = Math.min(0.05, (time - lastTime) / 1000);
+    lastTime = time;
+    if (journeyTarget && !paused) {
+      const progress = Math.min(1, (time - journeyStart) / 6500);
+      drawEarthScene(progress);
+      if (progress >= 1) {
+        const target = journeyTarget;
+        journeyTarget = null;
+        planet = target;
+        journeyCallback?.();
+      }
+      return;
+    }
+    if (!paused && !reduced) roverX += 0;
+    drawScene(time / 1000, delta);
+  };
+
+  const drawEarthScene = (progress: number): void => {
+    const sky = context.createLinearGradient(0, 0, 0, height);
+    sky.addColorStop(0, '#0c2639'); sky.addColorStop(1, '#6c817e');
+    context.fillStyle = sky; context.fillRect(0, 0, width, height);
+    stars.forEach((star) => { context.fillStyle = `rgba(255,255,255,${0.45 + star.r * 0.12})`; context.beginPath(); context.arc(star.x * width, star.y * height * 0.7, star.r, 0, Math.PI * 2); context.fill(); });
+    const earthX = width * 0.24;
+    const earthY = height * 0.43;
+    const radius = Math.min(width, height) * 0.22;
+    const gradient = context.createRadialGradient(earthX - radius * .45, earthY - radius * .45, radius * .1, earthX, earthY, radius);
+    gradient.addColorStop(0, '#80b6c4'); gradient.addColorStop(.63, '#367da2'); gradient.addColorStop(1, '#102c47');
+    context.fillStyle = gradient; context.beginPath(); context.arc(earthX, earthY, radius, 0, Math.PI * 2); context.fill();
+    context.fillStyle = '#839a78';
+    context.beginPath(); context.ellipse(earthX - 30, earthY - 15, radius * .37, radius * .18, -.6, 0, Math.PI * 2); context.fill();
+    context.beginPath(); context.ellipse(earthX + 45, earthY + 35, radius * .2, radius * .33, -.4, 0, Math.PI * 2); context.fill();
+    const targetX = width * .84;
+    const targetRadius = Math.min(width, height) * (journeyTarget === 'mars' ? .085 : .055);
+    context.fillStyle = journeyTarget === 'mars' ? '#b85f43' : '#b0ada4';
+    context.beginPath(); context.arc(targetX, height * .35, targetRadius, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = 'rgba(238,211,181,.32)'; context.lineWidth = 1; context.setLineDash([5, 7]);
+    context.beginPath(); context.moveTo(earthX + radius * .8, earthY - 18); context.quadraticCurveTo(width * .55, height * .12, targetX - targetRadius, height * .35); context.stroke(); context.setLineDash([]);
+    const shipX = earthX + (targetX - earthX) * progress;
+    const shipY = earthY - 16 - Math.sin(progress * Math.PI) * height * .22;
+    context.save(); context.translate(shipX, shipY); context.rotate(-.15);
+    context.fillStyle = '#e9dfce'; context.beginPath(); context.moveTo(-25, -6); context.lineTo(19, -6); context.lineTo(30, 0); context.lineTo(19, 6); context.lineTo(-25, 6); context.closePath(); context.fill();
+    context.fillStyle = '#b96d48'; context.beginPath(); context.moveTo(-25, -7); context.lineTo(-38, 0); context.lineTo(-25, 7); context.fill();
+    context.fillStyle = '#f5a35b'; context.beginPath(); context.moveTo(-28, -3); context.lineTo(-48, 0); context.lineTo(-28, 3); context.fill(); context.restore();
+    context.fillStyle = 'rgba(255,246,231,.9)'; context.font = '10px monospace'; context.fillText(`${journeyTarget?.toUpperCase() ?? 'DESTINATION'} TRANSIT · ${Math.round(progress * 100)}%`, 24, height - 38);
+  };
+
+  const drawScene = (time: number, _delta: number): void => {
+    const isEarth = planet === 'earth';
+    const sky = context.createLinearGradient(0, 0, 0, height);
+    if (isEarth) { sky.addColorStop(0, '#102d43'); sky.addColorStop(.72, '#6e97a0'); sky.addColorStop(1, '#d8c6aa'); }
+    else if (planet === 'mars') { sky.addColorStop(0, '#8f6859'); sky.addColorStop(.54, '#d39b75'); sky.addColorStop(1, '#e5b08a'); }
+    else { sky.addColorStop(0, '#24292e'); sky.addColorStop(.7, '#6a6b68'); sky.addColorStop(1, '#b0aaa0'); }
+    context.fillStyle = sky; context.fillRect(0, 0, width, height);
+    stars.forEach((star) => { if (planet !== 'earth') { context.fillStyle = `rgba(255,255,255,${0.25 + star.r * .15})`; context.beginPath(); context.arc(star.x * width, star.y * height * .65, star.r, 0, Math.PI * 2); context.fill(); } });
+    if (isEarth) {
+      const r = Math.min(width, height) * .27;
+      const x = width * .56; const y = height * .49;
+      const g = context.createRadialGradient(x - r * .4, y - r * .3, 4, x, y, r);
+      g.addColorStop(0, '#9ac7cf'); g.addColorStop(.6, '#317fa4'); g.addColorStop(1, '#153149');
+      context.fillStyle = g; context.beginPath(); context.arc(x, y, r, 0, Math.PI * 2); context.fill();
+      context.fillStyle = '#859a71'; context.beginPath(); context.ellipse(x - 35, y - 23, r * .36, r * .19, -.55, 0, Math.PI * 2); context.fill();
+      context.fillStyle = 'rgba(255,255,255,.25)'; context.beginPath(); context.ellipse(x, y - r * .8, r * 1.15, r * .2, -.1, 0, Math.PI * 2); context.fill();
+      return;
+    }
+    const horizon = height * .66;
+    if (planet === 'mars') {
+      terrain(horizon - 85, '#b06a4c', 1.3);
+      terrain(horizon - 35, '#98513c', 2.8);
+      terrain(horizon, '#a95f42', 4.3);
+      terrain(horizon + 44, '#754333', 6.2);
+      const sunX = width * .78; const sunY = height * .19;
+      const sunGradient = context.createRadialGradient(sunX, sunY, 3, sunX, sunY, 42);
+      sunGradient.addColorStop(0, '#ffe2b6'); sunGradient.addColorStop(1, 'rgba(255,205,153,0)');
+      context.fillStyle = sunGradient; context.beginPath(); context.arc(sunX, sunY, 42, 0, Math.PI * 2); context.fill();
+      drawHabitat(width * .54, horizon + 15, Math.min(1.1, width / 1100));
+      drawHabitat(width * .72, horizon + 20, Math.min(.72, width / 1500));
+      drawRover(width * (.72 + roverX / 600), horizon + 26, Math.min(.7, width / 1500));
+      drawAstronaut(width * .46, horizon + 10, .7, '#bb764e');
+      drawAstronaut(width * .49, horizon + 13, .62, '#587b87');
+    } else {
+      terrain(horizon - 55, '#8c8981', 1.4);
+      terrain(horizon - 10, '#72706a', 3.1);
+      terrain(horizon + 39, '#4c4b48', 4.7);
+      [[.23, .61, 40], [.72, .69, 29], [.89, .6, 18]].forEach(([x, y, r]) => {
+        context.strokeStyle = 'rgba(45,45,44,.3)'; context.lineWidth = 5; context.beginPath(); context.ellipse(width * x, height * y, r, r * .4, 0, 0, Math.PI * 2); context.stroke();
+      });
+      drawHabitat(width * .55, horizon + 21, Math.min(1, width / 1100));
+      drawRover(width * .73, horizon + 30, Math.min(.7, width / 1500));
+      drawAstronaut(width * .46, horizon + 15, .7, '#64727c');
+    }
+    context.fillStyle = 'rgba(245,222,196,.16)';
+    for (let i = 0; i < 20; i += 1) {
+      const x = (i * 139 + time * (reduced ? 0 : 3)) % width;
+      const y = horizon + (i * 53) % Math.max(10, height - horizon);
+      context.fillRect(x, y, 1.3, 1.3);
+    }
+  };
+
+  resize();
+  window.addEventListener('resize', resize);
+  frame = requestAnimationFrame(drawFrame);
+  return {
+    rendererName: 'Canvas 2D fallback',
+    setPlanet(value) { planet = value; journeyTarget = null; },
+    setPaused(value) { paused = value; },
+    setGraphicsQuality(value) { quality = value; resize(); },
+    setReducedMotion(value) { reduced = value; },
+    setCameraMode(value) { cameraMode = value; void cameraMode; },
+    deployRover() { roverDeployed = true; roverX = Math.min(52, roverX + 16); },
+    driveRover(direction) { if (roverDeployed) roverX = Math.max(-50, Math.min(50, roverX + Math.sign(direction) * 9)); },
+    playJourney(destination, onComplete) { if (reduced) { planet = destination; onComplete?.(); return; } journeyTarget = destination; journeyStart = performance.now(); journeyCallback = onComplete; paused = false; },
+    destroy() { cancelAnimationFrame(frame); window.removeEventListener('resize', resize); },
+  };
+}

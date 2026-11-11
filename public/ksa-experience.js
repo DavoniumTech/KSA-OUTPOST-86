@@ -1,10 +1,10 @@
-/* KSA OUTPOST 86 — Mission Experience Layer v2.1.0
+/* KSA OUTPOST 86 — Mission Experience Layer v2.2.0
    Original UI, audio cues and procedural surface scan assets for the KSA student simulation.
    This layer augments the existing PlayCanvas experience; it does not replace the game engine. */
 (() => {
   'use strict';
 
-  const VERSION = '2.1.0';
+  const VERSION = '2.2.0';
   const app = document.getElementById('app');
   const uiRoot = document.getElementById('ui-root');
   if (!app || !uiRoot || document.getElementById('ksa-console')) return;
@@ -394,7 +394,7 @@
   // First-visit boot marker; never blocks the original menu or mission start.
   if (!prefersReducedMotion) {
     const boot = document.createElement('div'); boot.className = 'ksa-boot-stamp';
-    boot.innerHTML = '<span>86</span><b>OUTPOST SYSTEMS ONLINE</b><small>MISSION EXPERIENCE v2.1.0</small>';
+    boot.innerHTML = '<span>86</span><b>OUTPOST SYSTEMS ONLINE</b><small>MISSION EXPERIENCE v2.2.0</small>';
     app.appendChild(boot);
     window.setTimeout(() => boot.classList.add('is-gone'), 1450);
     window.setTimeout(() => boot.remove(), 2100);

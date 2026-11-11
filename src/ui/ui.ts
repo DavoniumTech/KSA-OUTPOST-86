@@ -3,10 +3,11 @@ import {
   type MissionAction,
   type MissionState,
 } from '../game/simulation';
-import type { Interactable } from '../engine/createWorld';
+import type { Interactable } from '../engine/babylonWorld';
 import type { AssistantReply } from '../game/assistant';
+import { createLanderState, startLander, stepLander, type LanderState } from '../game/lander';
 
-export type ScreenName = 'menu' | 'briefing' | 'guide' | 'about' | 'settings' | 'game' | 'pause' | 'debrief' | 'sources';
+export type ScreenName = 'menu' | 'briefing' | 'guide' | 'about' | 'settings' | 'game' | 'pause' | 'debrief' | 'sources' | 'lander-lab';
 
 export interface UiCallbacks {
   startMission(): void;
@@ -111,12 +112,18 @@ export class GameUI {
   private nearest: Interactable | null = null;
   private assistantOpen = false;
   private assistantMessageCount = 0;
+  private landerState: LanderState = createLanderState();
+  private landerThrottle = 0.55;
+  private landerLateral = 0;
+  private landerAnimationFrame: number | null = null;
+  private landerLastFrame = 0;
 
   constructor(root: HTMLElement, callbacks: UiCallbacks) {
     this.root = root;
     this.callbacks = callbacks;
     this.root.addEventListener('click', this.handleClick);
     this.root.addEventListener('change', this.handleChange);
+    this.root.addEventListener('input', this.handleInput);
     this.root.addEventListener('submit', this.handleSubmit);
     this.renderMenu();
   }
@@ -130,6 +137,7 @@ export class GameUI {
   }
 
   showScreen(screen: ScreenName, state?: MissionState): void {
+    if (this.screen === 'lander-lab' && screen !== 'lander-lab') this.stopLanderLoop();
     this.screen = screen;
     this.modalId = null;
     if (screen === 'menu') this.renderMenu();
@@ -141,6 +149,7 @@ export class GameUI {
     if (screen === 'pause') this.renderPause();
     if (screen === 'debrief' && state) this.renderDebrief(state);
     if (screen === 'sources') this.renderSources();
+    if (screen === 'lander-lab') this.renderLanderLab();
   }
 
   renderHud(state: MissionState, nearest: Interactable | null): void {
@@ -290,6 +299,9 @@ export class GameUI {
       case 'about': this.callbacks.openScreen('about'); break;
       case 'settings': this.callbacks.openScreen('settings'); break;
       case 'sources': this.callbacks.openScreen('sources'); break;
+      case 'lander-lab': this.callbacks.openScreen('lander-lab'); break;
+      case 'lander-start': this.startLanderRun(); break;
+      case 'lander-reset': this.resetLanderRun(); break;
       case 'menu': this.callbacks.openScreen('menu'); break;
       case 'advance': this.callbacks.advanceDay(); break;
       case 'close-panel': this.closeInteraction(); break;
@@ -318,6 +330,21 @@ export class GameUI {
       this.showToast('Graphics setting updated', `${target.value.toUpperCase()} quality selected.`);
     }
     if (target.dataset.uiAction === 'reduced-motion') this.callbacks.setReducedMotion((target as HTMLInputElement).checked);
+  };
+
+  private handleInput = (event: Event): void => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (target.id === 'lander-throttle') {
+      this.landerThrottle = Number(target.value) / 100;
+      const output = this.root.querySelector<HTMLOutputElement>('#lander-throttle-value');
+      if (output) output.value = `${target.value}%`;
+    }
+    if (target.id === 'lander-lateral') {
+      this.landerLateral = Number(target.value) / 100;
+      const output = this.root.querySelector<HTMLOutputElement>('#lander-lateral-value');
+      if (output) output.value = this.landerLateral === 0 ? 'NEUTRAL' : `${Math.abs(Number(target.value))}% ${this.landerLateral < 0 ? 'LEFT' : 'RIGHT'}`;
+    }
   };
 
   private toggleAssistant(): void {
@@ -388,11 +415,11 @@ export class GameUI {
         <h1>BUILD.<br><em>SURVIVE.</em><br>EXPLORE.</h1>
         <p class="menu-intro">One outpost. Seven mission days. Your decisions keep the crew, the equipment and the science alive.</p>
         <div class="menu-actions"><button class="primary-button" data-ui-action="start"><span>START MISSION</span><b>↗</b></button>${hasSavedMission ? '<button class="secondary-button" data-ui-action="continue">CONTINUE SAVED <span>→</span></button>' : '<button class="secondary-button" data-ui-action="guide">HOW TO PLAY <span>→</span></button>'}</div>
-        <div class="menu-links"><button data-ui-action="about">ABOUT THE PROJECT</button><button data-ui-action="sources">SCIENCE & SOURCES</button><button data-ui-action="settings">SETTINGS</button></div>
+        <div class="menu-links"><button data-ui-action="lander-lab">LUNAR LANDER LAB</button><button data-ui-action="about">ABOUT THE PROJECT</button><button data-ui-action="sources">SCIENCE & SOURCES</button><button data-ui-action="settings">SETTINGS</button></div>
       </div>
       <aside class="mission-preview"><div class="preview-tag">MISSION 01 <span>FIRST LIGHT</span></div><div class="preview-orbit"><div class="orbit-ring"></div><div class="orbit-moon"></div><div class="orbit-satellite">✦</div></div>
         <div class="preview-data"><div><small>LOCATION</small><strong>POLAR RIDGE</strong></div><div><small>DURATION</small><strong>7 DAYS</strong></div><div><small>ROLE</small><strong>OUTPOST COMMANDER</strong></div></div>
-        <div class="preview-foot"><span>FICTIONAL TRAINING SITE</span><span>V. 2.1.0</span></div>
+        <div class="preview-foot"><span>FICTIONAL TRAINING SITE</span><span>V. 2.2.0</span></div>
       </aside></div>
       <div class="menu-footer"><span>AN EDUCATIONAL PROJECT BY KSA</span><span>NOT A NASA PRODUCT · NOT ENGINEERING GUIDANCE</span></div>
     </div>`;
@@ -451,6 +478,236 @@ export class GameUI {
         <a href="https://science.nasa.gov/resource/shadows-near-the-moons-south-pole/" target="_blank" rel="noreferrer"><span>NASA SCIENCE VISUALIZATION STUDIO</span><strong>Shadows near the Moon’s South Pole</strong><small>How long shadows move across rugged polar terrain.</small></a>
         <a href="https://www.spaceappschallenge.org/2026/challenges/junior-astronaut-mission-trainer/" target="_blank" rel="noreferrer"><span>NASA SPACE APPS · 2026</span><strong>Build a Junior Astronaut Mission Trainer</strong><small>The official challenge statement.</small></a></div>
         <div class="training-note"><strong>LIMITATIONS</strong><p>Mission resources use invented training units on a 0–100 scale. The radiation alert is procedural, not a dose forecast. The outpost, sample and events are fictional. This is not validated mission planning software.</p></div></main></div>`;
+  }
+
+  private renderLanderLab(): void {
+    this.stopLanderLoop();
+    this.landerState = createLanderState();
+    this.landerThrottle = 0.55;
+    this.landerLateral = 0;
+    this.root.innerHTML = `<div class="screen info-screen lander-lab-screen">
+      <header class="screen-header"><div class="brand-lockup"><span class="brand-symbol">86</span><span><strong>KSA OUTPOST 86</strong><small>ASTRONAUT ACADEMY · TRAINING LAB</small></span></div><button class="text-button" data-ui-action="menu">← BACK TO MISSION CONTROL</button></header>
+      <main class="lander-layout"><div class="eyebrow">TRAINING LAB / 01 · DESCENT & TOUCHDOWN</div><h1>LAND SOFTLY.</h1><p class="lead">Guide a training lander towards a marked lunar pad. Manage vertical thrust, reduce lateral drift and aim for a controlled touchdown.</p>
+        <div class="lander-grid"><section class="lander-visual-panel"><div class="lander-panel-heading"><span>APPROACH DISPLAY</span><strong data-lander-phase>READY FOR DESCENT</strong></div>
+          <canvas id="lander-canvas" width="960" height="480" role="img" aria-label="Animated two-dimensional lunar lander approach with altitude and landing pad visualisation">Lunar lander training display.</canvas>
+          <div class="lander-telemetry"><article><small>ALTITUDE</small><strong data-lander-stat="altitude">180 m</strong></article><article><small>VERTICAL SPEED</small><strong data-lander-stat="vertical">11.5 m/s DOWN</strong></article><article><small>HORIZONTAL SPEED</small><strong data-lander-stat="horizontal">2.2 m/s</strong></article><article><small>FUEL RESERVE</small><strong data-lander-stat="fuel">100%</strong></article></div>
+        </section>
+        <aside class="lander-controls"><div class="lander-controls-overline">FLIGHT CONTROLS</div><h2>TRIM YOUR APPROACH.</h2><p>Raise engine thrust to slow the descent. Use lateral trim to reduce sideways speed and approach the landing marker.</p>
+          <div class="lander-coaching"><strong>QUICK COACHING · GAME VALUES</strong><span>Try about 55% thrust early. Briefly trim LEFT to cancel the initial drift, then ease towards 36% when descent speed is near 3 m/s.</span></div>
+          <label class="lander-control" for="lander-throttle"><span><strong>VERTICAL THRUST</strong><output id="lander-throttle-value">55%</output></span><input id="lander-throttle" type="range" min="0" max="100" value="55" step="1"><small>0% · FREE DESCENT <b>100% · MAX THRUST</b></small></label>
+          <label class="lander-control" for="lander-lateral"><span><strong>LATERAL TRIM</strong><output id="lander-lateral-value">NEUTRAL</output></span><input id="lander-lateral" type="range" min="-100" max="100" value="0" step="1"><small>LEFT <b>RIGHT</b></small></label>
+          <div class="lander-button-row"><button class="primary-button" data-ui-action="lander-start" id="lander-start">START DESCENT <b>↗</b></button><button class="secondary-button" data-ui-action="lander-reset">RESET</button></div>
+          <div class="lander-status" data-lander-message aria-live="polite">SYSTEM READY · Start the descent, then adjust the controls while the lander is moving.</div>
+          <div class="lander-rubric"><strong>TRAINING LANDING RUBRIC</strong><p>For this game, a safe landing requires low vertical speed, low sideways speed and arrival near the pad. These are game scoring thresholds, not real-world lander certification limits.</p></div>
+        </aside></div>
+        <div class="training-note lander-model-note"><strong>MODEL TRANSPARENCY</strong><p>This is a simplified 2D classroom exercise using fixed game parameters. It does not solve real lunar descent guidance, navigation, propulsion, terrain-relative navigation or spacecraft flight dynamics.</p></div>
+      </main><footer class="screen-footer"><span>BUILD. SURVIVE. EXPLORE.</span><span>KSA STUDENT PROJECT · NOT NASA-ENDORSED</span></footer></div>`;
+    this.updateLanderDisplay();
+    this.drawLanderScene();
+  }
+
+  private startLanderRun(): void {
+    if (this.landerState.phase === 'flight') return;
+    if (this.landerState.phase !== 'ready') this.resetLanderRun();
+    this.landerState = startLander(this.landerState);
+    this.landerLastFrame = 0;
+    const button = this.root.querySelector<HTMLButtonElement>('#lander-start');
+    if (button) { button.disabled = true; button.textContent = 'DESCENT IN PROGRESS'; }
+    this.landerAnimationFrame = window.requestAnimationFrame(this.tickLanderFrame);
+    this.updateLanderDisplay();
+  }
+
+  private resetLanderRun(): void {
+    this.stopLanderLoop();
+    this.landerState = createLanderState();
+    this.landerThrottle = 0.55;
+    this.landerLateral = 0;
+    const throttle = this.root.querySelector<HTMLInputElement>('#lander-throttle');
+    const lateral = this.root.querySelector<HTMLInputElement>('#lander-lateral');
+    if (throttle) throttle.value = '55';
+    if (lateral) lateral.value = '0';
+    const throttleValue = this.root.querySelector<HTMLOutputElement>('#lander-throttle-value');
+    const lateralValue = this.root.querySelector<HTMLOutputElement>('#lander-lateral-value');
+    if (throttleValue) throttleValue.value = '55%';
+    if (lateralValue) lateralValue.value = 'NEUTRAL';
+    this.updateLanderDisplay();
+    this.drawLanderScene();
+  }
+
+  private stopLanderLoop(): void {
+    if (this.landerAnimationFrame !== null) window.cancelAnimationFrame(this.landerAnimationFrame);
+    this.landerAnimationFrame = null;
+    this.landerLastFrame = 0;
+  }
+
+  private tickLanderFrame = (timestamp: number): void => {
+    if (this.screen !== 'lander-lab' || this.landerState.phase !== 'flight') {
+      this.landerAnimationFrame = null;
+      return;
+    }
+    const delta = this.landerLastFrame === 0 ? 1 / 60 : Math.min((timestamp - this.landerLastFrame) / 1000, 0.05);
+    this.landerLastFrame = timestamp;
+    this.landerState = stepLander(this.landerState, {
+      throttle: this.landerThrottle,
+      lateral: this.landerLateral,
+    }, delta);
+    this.updateLanderDisplay();
+    this.drawLanderScene();
+    if (this.landerState.phase === 'flight') {
+      this.landerAnimationFrame = window.requestAnimationFrame(this.tickLanderFrame);
+    } else {
+      this.landerAnimationFrame = null;
+    }
+  };
+
+  private updateLanderDisplay(): void {
+    const state = this.landerState;
+    const altitude = this.root.querySelector<HTMLElement>('[data-lander-stat="altitude"]');
+    const vertical = this.root.querySelector<HTMLElement>('[data-lander-stat="vertical"]');
+    const horizontal = this.root.querySelector<HTMLElement>('[data-lander-stat="horizontal"]');
+    const fuel = this.root.querySelector<HTMLElement>('[data-lander-stat="fuel"]');
+    const phase = this.root.querySelector<HTMLElement>('[data-lander-phase]');
+    const message = this.root.querySelector<HTMLElement>('[data-lander-message]');
+    const button = this.root.querySelector<HTMLButtonElement>('#lander-start');
+    if (altitude) altitude.textContent = `${Math.round(state.altitude)} m`;
+    if (vertical) vertical.textContent = `${Math.abs(state.verticalVelocity).toFixed(1)} m/s ${state.verticalVelocity < 0 ? 'DOWN' : 'UP'}`;
+    if (horizontal) horizontal.textContent = `${Math.abs(state.horizontalVelocity).toFixed(1)} m/s`;
+    if (fuel) fuel.textContent = `${Math.round(state.fuel)}%`;
+    if (phase) {
+      phase.textContent = state.phase === 'ready' ? 'READY FOR DESCENT'
+        : state.phase === 'flight' ? 'DESCENT ACTIVE'
+          : state.phase === 'landed' ? 'SAFE TOUCHDOWN' : 'LANDING CONTACT · RETRY';
+      phase.dataset.phase = state.phase;
+    }
+    if (message) {
+      message.textContent = state.phase === 'ready' ? 'SYSTEM READY · Start the descent, then adjust the controls while the lander is moving.'
+        : state.phase === 'flight' ? 'FLIGHT ACTIVE · Watch the speed indicators and keep trimming your approach.'
+          : state.phase === 'landed' ? 'SAFE TOUCHDOWN · The training lander reached the pad within the exercise scoring limits.'
+            : 'HARD LANDING · The training limits were exceeded. Reset and try a slower, better-aligned approach.';
+      message.dataset.phase = state.phase;
+    }
+    if (button) {
+      button.disabled = state.phase === 'flight';
+      button.innerHTML = state.phase === 'ready' ? 'START DESCENT <b>↗</b>' : state.phase === 'flight' ? 'DESCENT IN PROGRESS' : 'RUN AGAIN <b>↻</b>';
+    }
+  }
+
+  private drawLanderScene(): void {
+    const canvas = this.root.querySelector<HTMLCanvasElement>('#lander-canvas');
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context) return;
+    const width = canvas.width;
+    const height = canvas.height;
+    const groundY = 420;
+    const state = this.landerState;
+    context.clearRect(0, 0, width, height);
+
+    const sky = context.createLinearGradient(0, 0, 0, height);
+    sky.addColorStop(0, '#071321');
+    sky.addColorStop(0.72, '#172532');
+    sky.addColorStop(1, '#28323b');
+    context.fillStyle = sky;
+    context.fillRect(0, 0, width, height);
+
+    for (let index = 0; index < 72; index += 1) {
+      const x = (index * 137 + 31) % width;
+      const y = (index * 67 + 23) % 260;
+      const radius = index % 9 === 0 ? 1.7 : 0.85;
+      context.fillStyle = index % 5 === 0 ? '#d7c9a6' : '#9fb3c1';
+      context.globalAlpha = 0.32 + (index % 6) * 0.1;
+      context.beginPath();
+      context.arc(x, y, radius, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.globalAlpha = 1;
+
+    context.fillStyle = '#39434b';
+    context.beginPath();
+    context.moveTo(0, groundY - 34);
+    for (let x = 0; x <= width; x += 24) {
+      const ridge = groundY - 34 + Math.sin(x * 0.012) * 12 + Math.sin(x * 0.034 + 1.1) * 8;
+      context.lineTo(x, ridge);
+    }
+    context.lineTo(width, height);
+    context.lineTo(0, height);
+    context.closePath();
+    context.fill();
+    context.fillStyle = '#73716d';
+    context.fillRect(0, groundY, width, height - groundY);
+
+    const padCenter = width / 2;
+    context.strokeStyle = '#efaa5a';
+    context.lineWidth = 3;
+    context.beginPath();
+    context.moveTo(padCenter - 78, groundY);
+    context.lineTo(padCenter + 78, groundY);
+    context.stroke();
+    context.strokeStyle = '#efaa5a66';
+    context.lineWidth = 1;
+    context.setLineDash([7, 8]);
+    context.beginPath();
+    context.moveTo(padCenter, 28);
+    context.lineTo(padCenter, groundY - 3);
+    context.stroke();
+    context.setLineDash([]);
+    context.fillStyle = '#f3bf7f';
+    context.font = '12px monospace';
+    context.fillText('TRAINING PAD 01', padCenter - 49, groundY + 24);
+
+    const landerX = padCenter + state.horizontalPosition * 5.3;
+    const landerY = Math.max(62, groundY - state.altitude * 1.75 - 26);
+    const lean = Math.max(-0.24, Math.min(0.24, state.horizontalVelocity * 0.025));
+    context.save();
+    context.translate(landerX, landerY);
+    context.rotate(lean);
+    if (state.phase === 'flight' && this.landerThrottle > 0.08) {
+      const flameLength = 18 + this.landerThrottle * 42;
+      const flame = context.createLinearGradient(0, 15, 0, 15 + flameLength);
+      flame.addColorStop(0, '#fff0bd');
+      flame.addColorStop(0.45, '#f5a34d');
+      flame.addColorStop(1, '#d65c31');
+      context.fillStyle = flame;
+      context.beginPath();
+      context.moveTo(-7, 16);
+      context.lineTo(0, 16 + flameLength);
+      context.lineTo(7, 16);
+      context.closePath();
+      context.fill();
+    }
+    context.fillStyle = '#dce2e4';
+    context.strokeStyle = '#7f929e';
+    context.lineWidth = 2;
+    context.beginPath();
+    context.moveTo(-22, -10);
+    context.lineTo(-14, -25);
+    context.lineTo(14, -25);
+    context.lineTo(22, -10);
+    context.lineTo(17, 15);
+    context.lineTo(-17, 15);
+    context.closePath();
+    context.fill();
+    context.stroke();
+    context.fillStyle = '#456d83';
+    context.fillRect(-10, -19, 20, 10);
+    context.strokeStyle = '#c7d0d2';
+    context.lineWidth = 3;
+    context.beginPath();
+    context.moveTo(-14, 12); context.lineTo(-26, 28); context.lineTo(-38, 28);
+    context.moveTo(14, 12); context.lineTo(26, 28); context.lineTo(38, 28);
+    context.stroke();
+    context.restore();
+
+    if (state.phase === 'landed' || state.phase === 'crashed') {
+      context.fillStyle = state.phase === 'landed' ? '#75c49b' : '#e67871';
+      context.font = '700 25px monospace';
+      context.textAlign = 'center';
+      context.fillText(state.phase === 'landed' ? 'TOUCHDOWN CONFIRMED' : 'HARD LANDING', padCenter, 74);
+      context.textAlign = 'start';
+    }
+    context.fillStyle = '#d8e1e6';
+    context.font = '11px monospace';
+    context.fillText(`ALT ${Math.round(state.altitude)} M`, 24, 30);
+    context.fillText(`FUEL ${Math.round(state.fuel)}%`, 24, 49);
   }
 
   private renderGameShell(state?: MissionState): void {
@@ -547,8 +804,10 @@ export class GameUI {
   }
 
   destroy(): void {
+    this.stopLanderLoop();
     this.root.removeEventListener('click', this.handleClick);
     this.root.removeEventListener('change', this.handleChange);
+    this.root.removeEventListener('input', this.handleInput);
     this.root.removeEventListener('submit', this.handleSubmit);
     window.clearTimeout(this.toastTimer);
   }

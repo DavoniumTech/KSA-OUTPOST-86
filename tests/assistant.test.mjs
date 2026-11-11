@@ -42,15 +42,17 @@ test('assistant keeps radiation guidance within the simulation limits', () => {
   assert.match(reply.answer, /does not predict solar events/);
 });
 
-test('assistant accurately discloses missing Mars and launch implementations', () => {
+test('assistant explains the Earth departure and planetary transit training experience', () => {
   const reply = answerMissionQuestion('Can I travel to Mars or launch from Earth?', createInitialMission(), null);
-  assert.match(reply.answer, /does not yet contain a playable Earth launch sequence/);
-  assert.match(reply.answer, /Mars environment/);
+  assert.match(reply.answer, /Earth as the departure scene/);
+  assert.match(reply.answer, /Moon and Mars training environments/);
+  assert.match(reply.answer, /not a validated interplanetary trajectory/);
 });
 
-test('assistant does not claim the rover is controllable', () => {
+test('assistant accurately describes the simplified rover control', () => {
   const reply = answerMissionQuestion('Can I drive the rover?', createInitialMission(), null);
-  assert.match(reply.answer, /rover driving and robotic operations are not implemented/);
+  assert.match(reply.answer, /rover deployment/);
+  assert.match(reply.answer, /not a validated terrain-navigation/);
 });
 
 test('assistant reports blank and unknown questions safely', () => {

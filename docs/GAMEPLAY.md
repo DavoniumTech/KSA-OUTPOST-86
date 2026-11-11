@@ -1,53 +1,47 @@
-# Gameplay and Controls
+# Gameplay and controls — Orbital Frontier
 
-## Mission
+## Destinations
 
-**MISSION 01 — FIRST LIGHT**
+- **Earth:** departure/orbit experience and the starting point for cinematic journeys.
+- **Moon:** the preserved First Light lunar south-pole training campaign.
+- **Mars:** the new seven-day Red Frontier expedition.
 
-- Location: fictional Polar Ridge Training Site near the lunar south pole.
-- Length: seven accelerated training days.
-- Role: outpost commander.
-- Goal: commission essential systems, balance resources, respond to events, complete a surface survey and review the debrief.
+The Earth-to-destination sequence is a cinematic training representation. It is not a trajectory solver.
 
-## Daily objectives
+## Lunar mission — First Light
 
-1. **Day 1 — Commissioning:** inspect the power console and life-support panel.
-2. **Day 2 — Low sunlight:** choose a conserve, balanced or research power plan.
-3. **Day 3 — Water recovery:** repair the recovery unit at a battery cost, or conserve water without an equipment repair.
-4. **Day 4 — Radiation warning:** pause external work and secure the designated shelter.
-5. **Day 5 — Greenhouse:** select a growth cycle or a conservation schedule.
-6. **Day 6 — Science survey:** reach the ridge marker and collect a training regolith sample.
-7. **Day 7 — Final assessment:** run the final systems assessment from the mission terminal.
+The seven-day lunar campaign retains its existing deterministic training objectives:
 
-## World stations
+1. Day 1 — inspect power and life-support systems.
+2. Day 2 — choose a conserve, balanced or research power plan in reduced sunlight.
+3. Day 3 — repair water recovery or conserve water.
+4. Day 4 — secure the radiation shelter.
+5. Day 5 — choose a greenhouse growth or conservation plan.
+6. Day 6 — complete the science survey and collect a training sample.
+7. Day 7 — run the final systems assessment.
 
-- Power management console — generation, battery reserve and demand plan.
-- Life-support console — oxygen supply, cabin-air condition, CO₂ control and thermal condition.
-- Water-recovery unit — stored water and recovery condition.
-- Radiation shelter — crew-protection procedure.
-- Greenhouse — crop-growth or conservation schedule.
-- Science survey marker — fictional training sample.
-- Mission terminal — objective and day progression.
+## Mars mission — The Red Frontier
+
+The Mars campaign is an independent seven-day training model:
+
+1. Day 1 — commission the habitat and inspect integrated systems.
+2. Day 2 — choose balanced or conservative power under a regional dust front; array maintenance is available.
+3. Day 3 — repair the water-recovery filter or activate water conservation.
+4. Day 4 — suspend EVA activity and secure the habitat shelter during a solar-weather warning.
+5. Day 5 — choose greenhouse growth or a low-power holding schedule.
+6. Day 6 — deploy the rover and collect a simulated geological sample from the ridge route.
+7. Day 7 — assess crew readiness, reserves, habitat condition and mission progress.
+
+Mission meters and consequences are normalized educational game values, not operational hardware specifications.
 
 ## Controls
 
-- W A S D or arrow keys: move.
-- Mouse drag: orbit/look around the astronaut.
-- E: interact with the nearest station in range.
-- Escape: close the current equipment panel or pause the mission.
-- Touchscreen: use the virtual joystick, drag the view to look and tap INTERACT.
+The primary experience is navigated with on-screen controls, responsive navigation and mission action buttons. The scene supports planet selection, camera modes, rover deployment and rover drive actions. Graphics quality and reduced-motion options are available in Settings. The independent Lunar Lander Lab retains its own thrust and lateral-trim controls.
 
-The camera is third-person. Movement is bounded to the training site and uses simple proximity collision checks around large structures.
+## Crew assignments
 
-## Decision trade-offs
+The Crew screen records assignments locally. Selected rest, habitat and power assignments apply small immediate training adjustments to shared readiness or system indicators. These are simplified game effects; this release does not model each astronaut's physiology or detailed task scheduling.
 
-- **Conserve power:** lowers electrical demand but slows optional greenhouse growth.
-- **Balanced power:** keeps a middle demand target.
-- **Research priority:** raises optional electrical demand and can drain the battery during low solar generation.
-- **Repair water recovery:** spends battery points to improve recovery condition.
-- **Conserve water:** reduces daily use but does not repair the equipment.
-- **Grow crops:** progresses the greenhouse gradually while using additional water and power.
-- **Conserve greenhouse:** slows growth to reduce resource use.
-- **Shelter procedure:** records that external work has paused and the crew has moved to the protected area.
+## Lunar Lander Lab
 
-All numbers are deterministic training units, not flight hardware requirements.
+The Lander Lab remains a separate two-dimensional training exercise. Its parameters and landing rubric are simplified game values, not real spacecraft requirements or validated lunar landing physics.

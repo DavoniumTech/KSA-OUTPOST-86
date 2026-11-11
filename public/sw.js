@@ -1,11 +1,13 @@
-const CACHE_NAME = 'ksa-outpost-86-shell-v4';
+const CACHE_NAME = 'ksa-outpost-86-shell-v6';
 const APP_SHELL = [
   './', './index.html', './manifest.webmanifest', './favicon.svg',
-  './ksa-experience.js', './ksa-experience.css',
   './assets/audio/outpost-ambience.ogg', './assets/audio/suit-breathing.ogg',
   './assets/audio/boot-regolith-step.ogg', './assets/audio/radio-chirp.ogg',
   './assets/audio/system-warning.ogg', './assets/audio/mission-success.ogg',
-  './assets/audio/ui-soft-click.ogg', './assets/crew/ksa-astronaut-crew.svg'
+  './assets/audio/ui-soft-click.ogg', './assets/crew/ksa-astronaut-crew.svg',
+  './assets/terrain/south-pole-heightmap-2k.png', './assets/terrain/south-pole-normal-1k.png',
+  './assets/terrain/south-pole-roughness-1k.png', './assets/terrain/south-pole-regolith-albedo.jpg',
+  './assets/terrain/south-pole-atlas-preview.jpg'
 ];
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));

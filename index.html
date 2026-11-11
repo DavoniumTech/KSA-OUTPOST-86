@@ -3,19 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#08111e" />
-    <meta name="description" content="KSA OUTPOST 86 — an immersive lunar outpost training mission by Kuntau Science Academy." />
+    <meta name="theme-color" content="#f3efe6" />
+    <meta name="color-scheme" content="light" />
+    <meta name="description" content="KSA OUTPOST 86 — Orbital Frontier. Explore Earth, the Moon and Mars through an interactive planetary outpost training simulation." />
+    <meta name="application-name" content="KSA OUTPOST 86" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
     <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
-    <link rel="stylesheet" href="%BASE_URL%ksa-experience.css" />
-    <title>KSA OUTPOST 86 — Build. Survive. Explore.</title>
+    <link rel="preconnect" href="https://cdn.babylonjs.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <title>KSA OUTPOST 86 — Orbital Frontier</title>
   </head>
   <body>
     <div id="app">
-      <canvas id="game-canvas" aria-label="Interactive 3D lunar outpost environment"></canvas>
+      <canvas id="world-canvas" aria-label="Interactive three-dimensional Earth, Moon and Mars planetary environment"></canvas>
       <div id="ui-root"></div>
     </div>
     <script type="module" src="/src/main.ts"></script>
-    <script defer src="%BASE_URL%ksa-experience.js"></script>
   </body>
 </html>
