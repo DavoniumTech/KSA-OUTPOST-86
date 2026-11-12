@@ -1,8 +1,8 @@
 {
   "name": "ksa-outpost-86",
   "private": true,
-  "version": "3.5.0",
-  "description": "KSA OUTPOST 86 \u2014 Orbital Frontier interactive planetary adventure game.",
+  "version": "3.6.0",
+  "description": "KSA OUTPOST 86 \u2014 Orbital Frontier final competition release.",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",

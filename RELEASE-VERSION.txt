@@ -1,0 +1,3 @@
+KSA OUTPOST 86 v3.6.0 — FINAL COMPETITION POLISH
+Repository: https://github.com/DavoniumTech/KSA-OUTPOST-86.git
+Branch: main

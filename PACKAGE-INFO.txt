@@ -1,24 +1,35 @@
-KSA OUTPOST 86 — VERSION 3.5.0
-ORBITAL FRONTIER: PREMIUM INTERACTIVE SPACE ADVENTURE
+KSA OUTPOST 86 — VERSION 3.6.0
+ORBITAL FRONTIER — FINAL COMPETITION POLISH
 
 Repository: https://github.com/DavoniumTech/KSA-OUTPOST-86.git
 Target branch: main
 
-V3.5 player-experience updates:
-- New once-per-player V3.5 tutorial key; old tutorial completion no longer skips the hands-on flow.
-- App shell renders before the dynamically imported Babylon.js engine chunk.
-- Compact/mobile devices default to the Performance graphics profile.
-- Solar-system star/orbit geometry is reduced on Performance mode.
-- Avoids the duplicate solar-system rebuild during initial renderer hand-off.
-- Stops the GPU render loop while the app is paused or the browser tab is hidden.
-- Adds a one-tap 5-minute Mars demo that prebuilds the standard rocket.
-- Keeps the full 3D Earth, Moon and Mars scenes, rocket launch, third-person controls, habitat interactions, rover and seven-day mission loops.
-- Crew manifest: Amara Okafor, Muhammad Imran, Shuaib and Jafar.
-- Fixed full-width header and navigation; larger mobile typography and onboarding viewport.
-- Existing lunar/Mars mission logic, saves, Mission Control, audio and Lunar Lander Lab retained.
+V3.6.0 includes:
+- Original KSA orbital brand emblem and release label.
+- Correct crew roster: Al-Amin (Commander), Imran (Pilot), Shuaib (Systems Engineer), Jafar (Science Specialist).
+- Safe migration of previous crew assignment identifiers and avatar initials.
+- Prominent Play now · 5-minute demo home action.
+- Working notification close and mission-journal actions, outside-click and Escape dismissal.
+- Service worker shell v10: network-first navigation HTML, cache fallback, API no-cache and old-shell cleanup.
+- Lazy Babylon.js runtime and on-demand Mars regolith albedo, normal and roughness maps.
+- Animated Mars relay satellite and slow asteroid-belt drift.
+- Better mobile mission HUD and readable touch targets.
+- Performance-first graphics profile on compact devices, pause rendering while hidden or on non-game views.
+- Earth/Moon/Mars scenes, rocket workshop and launch sequence, astronaut movement, habitat interactions, rover drive/scan, seven-day lunar and Mars campaigns, XP/badges, three themes, local guest saves and Lunar Lander Lab retained.
+- Cloudflare Worker source for optional authenticated player profile/save/event sync; requires deployed Worker, Durable Object bindings, correct route and GitHub Action secrets.
 
-Commands: npm ci; npm run typecheck; npm test; npm run build
+Validation actually executed in the release workspace:
+- TypeScript typecheck: PASS.
+- Existing automated tests: 42/42 PASS.
+- Worker JavaScript syntax: PASS.
+- Service-worker JavaScript syntax: PASS.
+- ZIP integrity: verified during packaging.
+- Vite production bundle: NOT RUN; npm dependencies could not be installed because the package registry was unavailable.
+- Real Android/browser performance measurements: NOT RUN.
+- GitHub push / Cloudflare deployment: NOT performed by this workspace.
 
-The account, cloud-save and live-session services require the Cloudflare Worker deployment and Durable Object bindings. Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as GitHub Actions repository secrets for the optional Cloudflare deployment job. Browser notifications are supported while the tab is in the background; closed-browser Web Push, email verification and email-based password reset are not implemented.
-
-This is an independent educational simulation and is not endorsed or certified by NASA. Terrain and spacecraft visuals are procedural game assets unless an explicit source and licence are listed in the asset credits.
+Science/asset honesty:
+- Mars surface textures are original procedural game art, not NASA imagery.
+- Planetary terrain and spacecraft/astronaut models are procedural educational visuals, not flight-qualified or photogrammetric assets.
+- Challenge-specific NASA Resources dataset integration must be checked and cited separately before making an eligibility claim.
+- See docs/LIMITATIONS.md, docs/SCIENCE.md and docs/ASSETS.md.

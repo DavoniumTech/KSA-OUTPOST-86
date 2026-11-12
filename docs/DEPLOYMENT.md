@@ -1,32 +1,37 @@
-# Deployment notes — v2.3.0
+# Deployment — KSA OUTPOST 86 v3.6.0
 
-## Existing production configuration
+## Production repository
 
-This project retains its Vite `dist` output and existing base-path behaviour:
+- Repository: `https://github.com/DavoniumTech/KSA-OUTPOST-86.git`
+- Production branch: `main`
+- Vite output: `dist/`
+- Existing GitHub Pages base: `/KSA-OUTPOST-86/`
+- Cloudflare Worker root build: set `WORKERS_CI=1` before the Vite build.
 
-- GitHub Pages uses `/KSA-OUTPOST-86/`.
-- A Cloudflare Workers asset build can use root base `/` when `WORKERS_CI=1`.
-- `wrangler.jsonc` remains the existing static-assets configuration.
-- `.github/workflows/deploy.yml` remains untouched; in the supplied baseline it deploys GitHub Pages, not Cloudflare.
+The supplied GitHub Actions workflow deploys GitHub Pages. The repository also includes `wrangler.jsonc` and `worker/index.js`, but these files do not by themselves prove that a Cloudflare Worker is deployed or that the custom domain points to it.
 
-Do not infer a Cloudflare Git integration from the presence of `wrangler.jsonc`. Verify the real Cloudflare account/project settings before claiming an automatic production deployment.
+## Build
 
-## Build commands
+Requires Node.js 22.16 or newer.
 
 ```powershell
 npm ci
+npm run typecheck
+npm test
 npm run build
 ```
 
-For the Workers root-path build:
+For a Cloudflare root-base static build:
 
 ```powershell
 $env:WORKERS_CI = '1'
 npm run build
 ```
 
-## Safe GitHub main deployment
+## Direct-to-main package deployment
 
-`scripts/Deploy-To-GitHubMain.ps1` accepts `-PackageRoot` and `-RepoRoot`. It checks the expected repository remote, requires a clean working tree and the currently checked-out `main` branch, verifies remote `main`, fast-forwards, overlays the package while preserving `.git`, `.github`, Cloudflare configuration and secrets, commits changes and pushes directly to `origin main`. It does not create a PR, branch or force-push.
+`scripts/Deploy-To-GitHubMain.ps1` accepts `-PackageRoot` and `-RepoRoot`. It verifies the expected origin, requires a clean working tree and `main`, fetches and fast-forwards safely, overlays package files while protecting `.git`, user secrets and production Cloudflare settings, commits the application update, pushes directly to `origin main` and checks that remote `main` matches the pushed commit.
 
-A successful push confirms GitHub accepted the commit. It does not, by itself, prove that a Cloudflare deployment completed.
+It does not create a pull request, a feature branch or a force-push. The included ZIP is intended to be extracted and deployed into the existing clone. GitHub authentication and permission to push to `main` are required.
+
+A successful Git push confirms GitHub accepted the commit. It does not, by itself, prove a Pages or Cloudflare deployment completed. Confirm the relevant GitHub Actions run and Cloudflare custom-domain/route settings separately.

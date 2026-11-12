@@ -1,6 +1,6 @@
 {
     "name":  "ksa-outpost-86",
-    "compatibility_date":  "2026-11-11",
+    "compatibility_date":  "2026-11-12",
     "assets":  {
                    "directory":  "./dist",
                    "binding":  "ASSETS",

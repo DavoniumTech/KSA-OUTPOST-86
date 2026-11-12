@@ -280,6 +280,26 @@ function createTerrain(B: any, scene: any, planet: Planet, baseUrl: string, qual
     albedo.uScale = 7;
     albedo.vScale = 7;
     ground.albedoTexture = albedo;
+  } else if (planet === 'mars') {
+    // Original, tileable Mars material maps are loaded only when Mars is
+    // selected. The first solar-system view and Moon therefore do not pay
+    // this download or decode cost.
+    const albedo = new B.Texture(`${baseUrl}assets/terrain/mars-regolith-albedo.webp`, scene, true, false, B.Texture.TRILINEAR_SAMPLINGMODE, undefined, () => undefined);
+    albedo.uScale = 8;
+    albedo.vScale = 8;
+    ground.albedoTexture = albedo;
+    const normal = new B.Texture(`${baseUrl}assets/terrain/mars-regolith-normal.webp`, scene, true, false, B.Texture.TRILINEAR_SAMPLINGMODE, undefined, () => undefined);
+    normal.uScale = 8;
+    normal.vScale = 8;
+    ground.bumpTexture = normal;
+    const metallicRoughness = new B.Texture(`${baseUrl}assets/terrain/mars-regolith-metallic-roughness.webp`, scene, true, false, B.Texture.TRILINEAR_SAMPLINGMODE, undefined, () => undefined);
+    metallicRoughness.uScale = 8;
+    metallicRoughness.vScale = 8;
+    // glTF/Babylon metallic-roughness convention: G = roughness, B = metalness.
+    ground.metallicTexture = metallicRoughness;
+    ground.useRoughnessFromMetallicTextureAlpha = false;
+    ground.useRoughnessFromMetallicTextureGreen = true;
+    ground.useMetallnessFromMetallicTextureBlue = true;
   } else {
     const texture = makeTexture(B, scene, planet);
     texture.uScale = 8;
@@ -690,6 +710,27 @@ function createSolarSystem(B: any, scene: any, quality: GraphicsQuality): { bodi
       }
       pivots.push({ node: satellitePivot, speed: 0.78, mesh: satellite });
     }
+    if (definition.id === 'mars') {
+      const relayOrbit = new B.TransformNode('mars-relay-satellite-orbit', scene);
+      relayOrbit.parent = planetMesh;
+      relayOrbit.rotation.x = 0.48;
+      const relayBody = B.MeshBuilder.CreateBox('mars-relay-satellite-body', { width: 0.62, height: 0.48, depth: 0.5 }, scene);
+      relayBody.parent = relayOrbit;
+      relayBody.position.x = 3.1;
+      const relayMat = new B.StandardMaterial('mars-relay-satellite-material', scene);
+      relayMat.diffuseColor = new B.Color3(0.68, 0.75, 0.8);
+      relayMat.emissiveColor = new B.Color3(0.035, 0.045, 0.055);
+      relayBody.material = relayMat;
+      for (const side of [-1, 1]) {
+        const wing = B.MeshBuilder.CreateBox(`mars-relay-wing-${side}`, { width: 1.2, height: 0.045, depth: 0.38 }, scene);
+        wing.parent = relayBody;
+        wing.position.x = side * 0.88;
+        const wingMat = new B.StandardMaterial(`mars-relay-wing-mat-${side}`, scene);
+        wingMat.diffuseColor = new B.Color3(0.12, 0.26, 0.49);
+        wing.material = wingMat;
+      }
+      pivots.push({ node: relayOrbit, speed: 0.62, mesh: relayBody });
+    }
     if (definition.id === 'saturn') {
       const rings = B.MeshBuilder.CreateTorus('saturn-visible-rings', { diameter: definition.size * 2.05, thickness: 0.72, tessellation: 72 }, scene);
       rings.parent = planetMesh;
@@ -711,16 +752,22 @@ function createSolarSystem(B: any, scene: any, quality: GraphicsQuality): { bodi
   const seed = B.MeshBuilder.CreatePolyhedron('asteroid-belt-seed', { type: 2, size: 0.42 }, scene);
   seed.material = asteroidMat;
   seed.setEnabled(false);
-  const asteroidCount = quality === 'low' ? 36 : quality === 'medium' ? 68 : 105;
+  const asteroidCount = quality === 'low' ? 24 : quality === 'medium' ? 68 : 105;
+  const asteroidOrbit = new B.TransformNode('asteroid-belt-orbit', scene);
   for (let i = 0; i < asteroidCount; i += 1) {
     const angle = hash(i, 6, 17) * Math.PI * 2;
     const radius = 64 + hash(i, 9, 14) * 6;
     const asteroid = seed.createInstance(`asteroid-${i}`);
+    asteroid.parent = asteroidOrbit;
     asteroid.position.set(Math.cos(angle) * radius, (hash(i, 3, 8) - 0.5) * 3.8, Math.sin(angle) * radius);
     const scale = 0.35 + hash(i, 5, 21) * 1.4;
     asteroid.scaling.set(scale * (0.7 + hash(i, 4, 6)), scale, scale * (0.8 + hash(i, 12, 4)));
     asteroid.rotation.set(hash(i, 14, 3), hash(i, 19, 4), hash(i, 2, 9));
   }
+
+  // The asteroid belt drifts slowly as a group: motion remains readable,
+  // while low graphics mode uses fewer instances for mobile performance.
+  pivots.push({ node: asteroidOrbit, speed: 0.012, mesh: seed });
 
   // Small transfer craft on an orbit that crosses the inner planets.
   const shipPivot = new B.TransformNode('solar-transfer-ship-orbit', scene);

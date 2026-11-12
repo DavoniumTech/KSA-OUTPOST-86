@@ -1,13 +1,16 @@
-# v2.3.0 — Known limitations and honest scope
+# KSA OUTPOST 86 v3.6.0 — Known limitations and honest scope
 
-- Babylon.js is loaded from the official CDN at `https://cdn.babylonjs.com/babylon.js`. It is not bundled into the ZIP. If that host cannot be reached, the Canvas 2D fallback keeps the application shell and mission interface available, but does not provide equivalent interactive 3D rendering.
-- WebGPU depends on the browser and device. WebGL is the intended fallback.
-- Earth, Moon and Mars terrain in this release is procedurally generated for an educational simulation. It is not a verified topographic reconstruction or measured live planetary terrain product.
-- Astronauts, spacecraft, rover and habitat components are procedural scene models. They are not certified engineering models or imported NASA photogrammetry.
+- The game worlds, terrain, astronauts, rocket/spacecraft, rover and habitats are original procedural educational visuals. They are not photogrammetric NASA models, certified engineering assets or commercial motion-capture character assets.
+- The Mars material maps introduced in v3.6.0 are procedural art textures, not NASA surface imagery or measured physical material data.
+- Earth surface artwork is illustrative rather than a current satellite basemap. Moon and Mars height geometry is procedural, not a verified digital elevation model.
 - The interplanetary journey is a cinematic educational sequence, not a validated orbital mechanics or trajectory-planning solver.
-- Mars resource meters, crew readiness and event effects are simplified game values, not spacecraft specifications, medical measurements or operational procedures.
-- The Mission Control helper is a deterministic offline knowledge helper, not a generative AI service and not a live NASA connection.
-- Browser-local saves are tied to the current browser profile/device. There is no account system or cross-device synchronization configured in the supplied repository.
-- NASA source links are supplied for learning and future research. Not every current procedural visual asset is NASA-derived.
-- The release container could not fetch GitHub or npm packages. TypeScript and unit tests passed, but the Vite production bundle and browser/device smoke tests were not run in this environment.
-- The supplied GitHub Actions workflow is for GitHub Pages. The existence of `wrangler.jsonc` alone does not prove that a Cloudflare account, Worker or Pages Git integration is connected. Confirm the actual Cloudflare deployment configuration separately.
+- The astronaut and rover controllers provide the implemented game interactions, but this is not a full commercial physics sandbox. Movement, collisions and mission values are simplified for learning and demonstration.
+- Resource meters, crew readiness, radiation levels and hazard outcomes are educational game values, not medical readings, operational spacecraft specifications or live telemetry.
+- The Mission Control helper is deterministic and local; it is not a generative AI service or live NASA connection.
+- Guest saves are stored in the current browser profile/device. Cloud sync requires a deployed and configured Cloudflare Worker, D1/DO bindings and valid production routing.
+- The Worker source includes account/profile/save/event handling, but the presence of source code does not prove that production Cloudflare resources, secrets, routes or account delivery settings are configured.
+- Browser notifications can be shown by an active page and, with permission, while the page is backgrounded. Web Push delivery after the browser is fully closed is not implemented as a verified service.
+- Existing v2.2.0 lunar terrain asset provenance could not be independently verified from the supplied archive. Do not attribute those files to NASA without confirming their origin and licence.
+- NASA science URLs in the app are references. This release does not claim that its procedural terrain was derived from NASA datasets or that a specific challenge Resources dataset has already been integrated. Verify and cite at least one dataset from the exact 2026 challenge Resources tab before making a Global Awards eligibility claim.
+- In this build container, npm registry and GitHub DNS were unavailable. TypeScript, the existing test suite and JavaScript syntax checks could run, but the Vite production bundle and live browser/device performance tests could not be verified here.
+- The latest live `main` branch could not be fetched from this container. The package is based on the V3.5 source ZIP available in the conversation, with v3.6 changes applied. The included deployment helper fetches and fast-forwards the user's authenticated `main` branch before overlaying the package, and refuses unsafe history divergence or local modifications.

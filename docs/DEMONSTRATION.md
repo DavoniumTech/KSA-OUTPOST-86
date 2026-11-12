@@ -1,35 +1,38 @@
-# Player and judge demonstration — v2.3.1
+# KSA OUTPOST 86 — V3.6 judge demonstration
 
-## Recommended 5–7 minute demonstration
+## Five-minute player route
 
-### 1. Start with the player guide
+### 1. Open the universe (0:00–0:40)
 
-Open the site and select **How to Play** in the fixed top bar. Explain that this release is a command-and-management simulator: players choose mission actions, manage resources and advance the day. The 3D scene supports camera orbit and zoom; it is not a free-roaming WASD astronaut game.
+Open the production app. The animated 3D solar-system preview shows the Sun, planets, satellite orbits, transfer craft and asteroid belt. A first-time visitor can complete the three-step tutorial or use **Skip tutorial**. The Home page starts with **Play now · 5-minute demo**.
 
-### 2. Open the Mars briefing
+### 2. Launch a mission (0:40–1:35)
 
-Return Home, select **Start guided mission**, review **The Red Frontier** briefing and select **Launch Mars expedition**. The application performs the cinematic training journey and then opens Outpost Command.
+Select **Play now · 5-minute demo**. The standard Mars rocket is preassembled. Review the displayed vehicle checks and select **Launch Expedition**. Show countdown, ignition, vehicle ascent and the destination transition.
 
-### 3. Complete the first objective
+### 3. Control the astronaut (1:35–2:30)
 
-On the Outpost page, point out the **START HERE** callout, the mission day, resource meters and Primary Objective. Select **Inspect integrated systems**. When the objective changes to complete, select **Complete day 1**. Explain that resource changes and mission progression are handled by the deterministic training model.
+After arrival, use `W/A/S/D` to walk, `Shift` to run, `E` to interact, `Space` for the movement action and `Esc` to pause. On a touch device, use the visible joystick and action buttons. Approach a highlighted station until the proximity prompt appears.
 
-### 4. Show a trade-off
+### 4. Demonstrate an engineering trade-off (2:30–3:30)
 
-Day 2 introduces a dust-front power decision. Choose a conserve or balanced power profile. Explain that conservation reduces optional demand, while balanced operations maintain activity but draw more from battery reserve when solar generation is reduced. Solar array cleaning is an additional maintenance action.
+Open the oxygen, power or water station. Demonstrate its actual interaction/puzzle and show how the selected action changes mission resources. Explain that the simulation is a simplified educational model.
 
-### 5. Show the mission systems
+### 5. Explore by rover (3:30–4:25)
 
-Navigate through Outpost, Crew and Explore. Explain the current scope honestly: crew assignment choices are recorded locally but are not yet a detailed individual astronaut task simulator. Mars Day 6 requires rover deployment before sample collection; the Explore view provides simple left/right rover movement controls.
+Approach the rover and choose **Enter rover**. Use `W/A/S/D` or the mobile steering controls to reach the glowing science beacon. Scan only when inside the marked survey zone. The sample is added to the science log.
 
-### 6. Demonstrate Science and Mission Control
+### 6. Connect the game to the NASA challenge (4:25–5:00)
 
-Open **More → Science & learning**. Ask Mission Control about the current objective, power or water. Explain that it is a deterministic offline knowledge helper, not a cloud generative AI service or live NASA data feed.
+Show the mission result or Outpost view. Explain how oxygen, water, power, food, radiation protection and crew safety create connected engineering decisions for a lunar or Martian outpost. Show the source/data card for any NASA dataset that is actually configured and credited in the submission.
 
-### 7. Demonstrate the Lunar Lander Lab
+## Crew
 
-Open **More → Lunar Lander Lab**. Start descent and use the vertical-thrust and lateral-control sliders to manage the simplified training landing. Explain that its physics and scoring are classroom values, not real spacecraft flight dynamics.
+- Al-Amin — Commander
+- Imran — Pilot
+- Shuaib — Systems Engineer
+- Jafar — Science Specialist
 
-## Accurate scope statement
+## Honest scope statement
 
-KSA OUTPOST 86 v2.3.1 provides Earth, Moon and Mars procedural environment views, a seven-day lunar First Light campaign, a separate seven-day Mars training model, mission-action buttons, rover deployment/sample flow, offline Mission Control, local saves and the Lunar Lander Lab. The experience is a command-and-management simulator. It does not yet implement free-roaming astronaut WASD movement, E-to-interact stations, physically validated terrain or measured NASA telemetry.
+The app uses Babylon.js and original procedural models/textures for its current astronaut, vehicles and planetary scenery. The astronaut controller, station interactions, rocket sequence and rover route are playable training systems, not a full commercial physics sandbox. The Mars regolith maps added in V3.6 are procedural game textures. Do not label them NASA datasets. The Cloudflare account and live-session API works only when the Worker and required bindings are deployed; guest play remains available without account setup. Browser notifications while the tab is in the background are not Web Push after the browser is fully closed.

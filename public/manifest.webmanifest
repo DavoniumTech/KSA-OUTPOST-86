@@ -1,13 +1,13 @@
 {
   "name": "KSA OUTPOST 86 \u2014 Orbital Frontier",
   "short_name": "KSA OUTPOST 86",
-  "description": "Explore Earth, Moon and Mars. Command a crew, explore a planetary outpost and learn space science.",
+  "description": "A playful planetary adventure: build rockets, explore worlds, command an outpost and learn space science.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#f3efe6",
-  "theme_color": "#f3efe6",
+  "theme_color": "#f4eee4",
   "icons": [
     {
       "src": "favicon.svg",

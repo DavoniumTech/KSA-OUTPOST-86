@@ -1,29 +1,23 @@
-# Science notes — KSA OUTPOST 86 v2.3.0
+# Science notes — KSA OUTPOST 86 v3.6.0
 
-KSA OUTPOST 86 is an educational simulation. Its purpose is to help students reason about interacting systems in a planetary habitat, not to reproduce a certified spacecraft design.
+KSA OUTPOST 86 is an independent educational game. It uses simplified systems to teach relationships between life support, oxygen, power, water recovery, food production, radiation protection, equipment reliability and crew safety.
 
-## Topics represented
-
-- Environmental control and life support.
-- Oxygen and cabin-air condition.
-- Water recovery and conservation.
-- Electrical generation, demand and battery reserves.
-- Radiation exposure and shelter decisions.
-- Greenhouse operation and food reserves.
-- Crew readiness and fatigue as simplified game indicators.
-- Surface mobility and geological sample collection.
-- Equipment inspection and maintenance.
-
-## Scientific scope
-
-Mars and lunar conditions differ in real life. This release gives them distinct educational settings and events but simplifies numerical calculations for the seven-day game. Values shown in game are normalized training units or percentages, not engineering units unless explicitly identified. The spacecraft journey is cinematic, not an orbital mechanics simulation.
-
-## Suggested authoritative reading
+## Scientific references
 
 - [NASA Science](https://science.nasa.gov/)
-- [NASA Eyes on the Solar System](https://science.nasa.gov/eyes/)
+- [NASA Eyes](https://science.nasa.gov/eyes/)
 - [NASA 3D Resources](https://science.nasa.gov/3d-resources/)
 - [NASA Solar System Treks](https://trek.nasa.gov/)
 - [NASA APIs](https://api.nasa.gov/)
 
-No NASA API key is needed for the core simulation. The app does not claim live NASA data feeds.
+These links are reference starting points. This release does not claim that every procedural terrain or resource value is directly derived from NASA data.
+
+## Data provenance and challenge submission
+
+Before claiming a NASA Space Apps Global Awards resource requirement is satisfied, inspect the official 2026 Junior Astronaut Mission Trainer challenge's own Resources section and integrate at least one listed dataset. Record the exact dataset name/identifier, source, retrieval date, measurement field, units, transformation and educational assumptions in the submission materials and in an in-game Data Card.
+
+No such challenge-specific dataset is claimed as integrated by this release. The current Mars texture maps and terrain are original procedural game content. The supplied lunar-map provenance remains unverified.
+
+## Training model caveat
+
+Resource quantities, events, crew-readiness values, spacecraft journey and equipment behaviour are simplified gameplay models. They are not flight-qualified engineering designs, operational procedures, medical advice or live spacecraft telemetry.

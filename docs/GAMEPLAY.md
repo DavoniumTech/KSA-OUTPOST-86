@@ -1,51 +1,43 @@
-# Gameplay and controls — Orbital Frontier v2.3.1
+# Gameplay and controls — Orbital Frontier v3.6.0
 
-## Start your first mission
+## Recommended first session
 
-1. Open the home screen and select **Start guided mission**, or open **Missions** and choose **The Red Frontier** (Mars) or **First Light** (Moon).
-2. Read the pre-flight briefing. It explains the destination, first objective and controls.
-3. Select **Launch Mars expedition** or **Launch Moon expedition**. The cinematic journey runs and the application opens the Outpost screen.
-4. On **Outpost**, read the **START HERE** instruction and the **Primary Objective**. Select the required action button.
-5. When the objective changes to **COMPLETE**, select **Complete day** to advance. The next day's event and objective then appear.
-6. Repeat through Day 7 and run the final assessment. Your mission progress saves locally in this browser.
+1. Open KSA OUTPOST 86 and complete or skip the three-step onboarding.
+2. On Home, choose **Play now · 5-minute demo** for a quick Mars start, or open **Explore the solar system** to choose a world.
+3. Use **Customise my rocket** to edit the configuration, or accept the standard build and start the launch flow.
+4. Follow the primary objective and the highlighted station marker after arrival.
+5. Complete the current day's mission activity before advancing the day.
 
-## Current interaction model
+## Desktop controls
 
-This release is a **command-and-management training simulator**, not a free-roaming third-person game. There is no astronaut WASD walking or E-to-interact station mechanic in this build. The primary gameplay uses the navigation bar and visible mission-action buttons.
+| Input | Action |
+|---|---|
+| W / A / S / D or arrow keys | Move astronaut / drive rover |
+| Mouse drag | Orbit/look camera |
+| Mouse wheel | Zoom |
+| Shift | Run |
+| Space | Jump |
+| E | Interact with nearby highlighted station / board or exit rover |
+| F | Scan when at a valid rover sample site |
+| Esc | Pause / open mission controls |
 
-- **3D camera:** drag with the mouse to orbit; use the mouse wheel to zoom. On touchscreens, swipe to orbit and pinch to zoom where supported.
-- **Mission actions:** select the action buttons in the Outpost Primary Objective panel.
-- **Advance mission:** complete the objective, then select **Complete day**. It is disabled until the current objective is complete.
-- **Rover (Mars Day 6):** open **Explore**, deploy the rover, use the left/right drive controls, then return to Outpost and collect the ridge sample. The sample objective is not complete until collection is confirmed.
-- **Planet views:** use **Worlds** to select Earth, Moon or Mars.
-- **Crew:** use **Crew** to review the four specialists. Assignments are recorded locally but are not yet a full individual crew-task simulation.
-- **More:** opens Science & learning, Mission journal, Lunar Lander Lab and Settings.
-- **Save:** mission progress is saved in the current browser. It is not synchronized to other devices.
+## Mobile controls
 
-## Mars mission — The Red Frontier
+Use the on-screen virtual joystick to walk or steer. Drag the 3D view to adjust the camera. Use the visible **INTERACT**, **JUMP**, **SCAN** and **EXIT ROVER** controls when available. Keep the phone in the recommended orientation shown by the game. If frame rate is low, select Performance in Settings; the 3D scene should still remain controllable.
 
-| Day | Primary objective | Player action |
-|---|---|---|
-| 1 | Commission the habitat | Inspect integrated systems. |
-| 2 | Ride out the dust front | Choose conserve or balanced power. Array cleaning is an additional maintenance action. |
-| 3 | Stabilise water recovery | Repair the filter or activate water conservation. |
-| 4 | Protect the crew | Secure the radiation shelter. |
-| 5 | Keep the greenhouse productive | Choose a growth cycle or low-power holding schedule. |
-| 6 | Complete the ridge survey | Deploy the rover, then collect the sample. The Explore screen also provides simple rover left/right movement. |
-| 7 | Complete mission assessment | Run the final assessment. |
+## Mars sample activity
 
-## Lunar mission — First Light
+On Mars Day 6, visit the rover station, deploy and board the rover, drive to the marked turquoise sample beacon and scan only when close enough. Return to the outpost and complete the day objective.
 
-The preserved seven-day lunar campaign covers commissioning, low sunlight and power planning, water recovery, radiation shelter, greenhouse scheduling, science survey and final assessment. The current objective panel shows the exact action required each day.
+## Habitat activities
 
-## Lunar Lander Lab
+Approach a highlighted station and press E or tap INTERACT. Example activities include oxygen valve alignment (`A → C → B`), solar service (`ALIGN → CLEAR → LOCK`), greenhouse setup (`WATER → LIGHT → NUTRIENTS`) and water-filter repair/conservation.
 
-Open **More → Lunar Lander Lab**. Select **Start descent**. Use the **Engine throttle** slider to control vertical thrust and the **Lateral control** slider to reduce sideways drift. Watch altitude, vertical speed and fuel. The target rubric is displayed below the controls. Use **Reset exercise** to try again. This is a simplified 2D training exercise, not validated spacecraft flight dynamics.
+## Crew
 
-## Mission Control helper
+- **Al-Amin** — Commander
+- **Imran** — Pilot
+- **Shuaib** — Systems Engineer
+- **Jafar** — Science Specialist
 
-Open **More → Science & learning**. Ask about the current objective, oxygen, power, water, radiation shelter, rover or crew readiness. It is an offline deterministic knowledge helper, not a cloud generative-AI service or live NASA data feed.
-
-## Educational limits
-
-Resource values and event outcomes are simplified training models, not spacecraft specifications, medical advice, radiation-dose guidance or live telemetry. The planetary worlds are procedural educational visualizations and should not be represented as measured NASA terrain unless a specific dataset is cited.
+The procedural astronaut animation and simplified training physics are educational game representations, not professional motion-capture or operational flight simulation.

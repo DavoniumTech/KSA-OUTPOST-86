@@ -1,7 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#101d2d"/>
-  <circle cx="32" cy="32" r="20" fill="none" stroke="#8ca8c3" stroke-width="2"/>
-  <path d="M13 35c7-9 31-15 39-6M18 44c10-4 23-4 31 0" fill="none" stroke="#f0a24d" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M32 11v42M11 32h42" stroke="#8ca8c3" stroke-opacity=".4"/>
-  <text x="32" y="36" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="700" fill="#fff">86</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">KSA Outpost 86 orbital emblem</title>
+  <defs>
+    <linearGradient id="bg" x1="12" y1="8" x2="86" y2="92" gradientUnits="userSpaceOnUse"><stop stop-color="#263f55"/><stop offset="1" stop-color="#0b1728"/></linearGradient>
+    <linearGradient id="orbit" x1="12" y1="30" x2="87" y2="68" gradientUnits="userSpaceOnUse"><stop stop-color="#f7d49a"/><stop offset=".52" stop-color="#e58a4f"/><stop offset="1" stop-color="#f4c17c"/></linearGradient>
+    <radialGradient id="planet" cx=".28" cy=".22" r=".85"><stop stop-color="#fff0cd"/><stop offset=".42" stop-color="#df9561"/><stop offset="1" stop-color="#844c43"/></radialGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect x="3" y="3" width="90" height="90" rx="25" fill="url(#bg)" stroke="#f0bd7f" stroke-opacity=".7" stroke-width="1.5"/>
+  <circle cx="48" cy="45" r="22" fill="url(#planet)"/>
+  <path d="M26 48c10-19 35-29 51-17 8 6 6 18-3 25-14 11-37 13-53 3-9-6-7-16 5-24" fill="none" stroke="url(#orbit)" stroke-width="4.2" stroke-linecap="round" filter="url(#glow)"/>
+  <path d="M18 70c18-7 43-7 60 0" fill="none" stroke="#9bc1d2" stroke-opacity=".55" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="76" cy="27" r="3" fill="#fff0c8" filter="url(#glow)"/>
+  <path d="M19 25l2.2 5.8L27 33l-5.8 2.2L19 41l-2.2-5.8L11 33l5.8-2.2z" fill="#fff0c8"/>
+  <text x="48" y="53" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="900" letter-spacing="-1.2" fill="#102133">86</text>
 </svg>

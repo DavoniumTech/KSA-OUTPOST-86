@@ -83,7 +83,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 #ui-root { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
 .app-header { position: fixed; inset: 0 0 auto; z-index: 50; height: calc(var(--header-height) + env(safe-area-inset-top)); padding: env(safe-area-inset-top) clamp(14px,3vw,34px) 0; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); background: var(--header-bg); color: var(--ink); backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); box-shadow: 0 8px 32px rgba(0,0,0,.08); pointer-events: auto; }
 .brand { border: 0; background: none; display: flex; align-items: center; gap: 11px; min-width: 0; padding: 0; text-align: left; }
-.brand-emblem { width: 42px; height: 42px; display: grid; place-items: center; flex: 0 0 auto; border: 1.5px solid var(--accent); border-radius: 14px 14px 14px 5px; background: linear-gradient(145deg,var(--accent-soft),transparent); color: var(--accent-strong); font: 800 15px 'Space Grotesk',sans-serif; transform: rotate(-4deg); }
+.brand-emblem { width: 44px; height: 44px; display: block; flex: 0 0 auto; border: 0; border-radius: 13px; background: transparent; overflow: hidden; transform: none; box-shadow: 0 5px 16px rgba(12,28,40,.15); }.brand-emblem img { width: 100%; height: 100%; display: block; }
 .brand-words { display: flex; flex-direction: column; gap: 3px; white-space: nowrap; }
 .brand-words strong { font: 800 13px 'Space Grotesk',sans-serif; letter-spacing: .1em; }
 .brand-words strong i { color: var(--accent); font-style: normal; }
@@ -814,4 +814,62 @@ button { touch-action: manipulation; }
 @media (prefers-reduced-motion: reduce) {
   .loading-orbit { animation-duration: 2.2s; }
   .demo-quick-button { transition: none; }
+}
+
+/* V3.6 final polish: readable brand mark and reliable notification panel interactions. */
+.notification-panel { position: relative; z-index: 1; }
+.notification-panel .modal-close { min-width: 44px; min-height: 44px; display: grid; place-items: center; cursor: pointer; }
+.notification-backdrop { cursor: pointer; }
+.notification-panel { cursor: default; }
+@media (max-width: 390px) { .brand { gap: 7px; }.brand-emblem { width: 38px; height: 38px; }.brand-words strong { font-size: 10px; }.header-actions { gap: 5px; }.header-more { min-width: 38px; }.header-alert { width: 38px; height: 38px; } }
+
+/* V3.6.0 — final mobile readability and touch target pass. */
+.game-day-pill { font-size: 12px; }
+.game-scene-label { font-size: 11px; letter-spacing: .1em; }
+.objective-head { font-size: 11px; letter-spacing: .08em; }
+.objective-widget p { font-size: 15px; line-height: 1.55; }
+.objective-foot { font-size: 11px; }
+.mini-cta { min-height: 42px; font-size: 13px; padding: 9px 13px; }
+.resource-meter-label { font-size: 13px; }
+.game-right-hud button { min-height: 42px; font-size: 12px; }
+.game-bottom-hud .interaction-hint strong { font-size: 15px; }
+.game-bottom-hud .interaction-hint small { font-size: 13px; }
+.training-station small { font-size: 13px; }
+.training-station strong { font-size: 16px; }
+.crew-info p { font-size: 14px; }
+.crew-info label { font-size: 12px; }
+.crew-info select { min-height: 42px; font-size: 14px; }
+.notification-entry p { font-size: 15px; line-height: 1.5; }
+.notification-entry small { font-size: 12px; }
+
+@media (max-width: 760px) {
+  .game-scene-label { font-size: 11px; }
+  .game-day-pill { font-size: 12px; }
+  .objective-head { font-size: 10px; }
+  .objective-widget h2 { font-size: 20px; }
+  .objective-widget p { font-size: 15px; line-height: 1.5; }
+  .objective-foot { font-size: 11px; }
+  .mini-cta { min-height: 44px; font-size: 13px; }
+  .game-resource .resource-meter-label { font-size: 12px; }
+  .game-right-hud button { min-height: 42px; padding: 9px 11px; font-size: 11px; }
+  .game-bottom-hud .interaction-hint { min-height: 54px; }
+  .game-bottom-hud .interaction-hint strong { font-size: 14px; }
+  .game-bottom-hud .interaction-hint small { font-size: 12px; }
+  .mobile-game-controls .touch-actions button { min-height: 48px; font-size: 12px; }
+  .nav-item { min-height: 54px; font-size: 11px; }
+  .nav-glyph { font-size: 21px; }
+  .crew-info h2 { font-size: 16px; }
+  .crew-info p { font-size: 14px; }
+  .crew-info label { font-size: 12px; }
+  .crew-info select { min-height: 44px; font-size: 14px; }
+  .page-shell p, .page-shell li { font-size: 16px; line-height: 1.55; }
+  .onboard-art-copy > p { font-size: 16px; line-height: 1.55; }
+  .training-station small { font-size: 13px; line-height: 1.4; }
+}
+
+@media (max-width: 380px) {
+  .nav-item { font-size: 10px; }
+  .nav-glyph { font-size: 19px; }
+  .game-right-hud button { min-height: 40px; padding: 8px 9px; font-size: 10px; }
+  .mobile-game-controls .touch-actions button { min-height: 46px; padding-inline: 10px; font-size: 11px; }
 }

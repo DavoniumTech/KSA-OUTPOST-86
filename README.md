@@ -1,16 +1,16 @@
-# KSA OUTPOST 86 — Version 3.5.0
+# KSA OUTPOST 86 — Version 3.6.0
 
 ## ORBITAL FRONTIER · A playable planetary adventure
 
-KSA OUTPOST 86 is an independent educational space-exploration game. Version 3.5 makes the experience faster to enter and clearer to play: players complete a three-step interactive 3D onboarding, select Earth/Moon/Mars, control an astronaut, explore a habitat, operate mission stations, board and drive a rover, scan a sample site, and progress through the existing lunar and Martian outpost campaigns.
+KSA OUTPOST 86 is an independent educational space-exploration game. Version 3.6 applies the final competition polish: a direct Play Now demo entry, an original orbital emblem, a corrected named crew, a fixed notification drawer, network-first app-shell updates for Android, additional animated solar-system objects and higher-detail Mars regolith materials. The experience includes: players complete a three-step interactive 3D onboarding, select Earth/Moon/Mars, control an astronaut, explore a habitat, operate mission stations, board and drive a rover, scan a sample site, and progress through the existing lunar and Martian outpost campaigns.
 
 > **Educational notice:** This is an independent fictional training game. NASA has not endorsed, certified or approved it. Game resources, events and spacecraft journeys are simplified learning models, not operational specifications or live spacecraft telemetry.
 
 ## Play the game
 
-1. Open the application. The new V3.5 onboarding appears once, even if an older tutorial was already completed. The first solar-system scene is lazy-loaded after the app shell.
+1. Open the application. The V3.6 onboarding appears once, even if an older tutorial was already completed. The first solar-system scene is lazy-loaded after the app shell.
 2. Complete the three onboarding steps: **Meet Your Crew**, **Choose Your Planet**, and **Learn to Command**. The final step teaches oxygen, power and water station interactions. Onboarding can be replayed from Settings.
-3. After onboarding, choose **Build my rocket**. For a guided fast start, use **5-minute demo** on Home; it preselects Mars and assembles the standard rocket. Review the flight check and press **Launch Expedition**. You can also customise every rocket component.
+3. After onboarding, choose **Play now · 5-minute demo** on Home; it preselects Mars and assembles the standard rocket. Review the flight check and press **Launch Expedition**. Choose **Customise my rocket** if you want to change components first. You can also customise every rocket component.
 4. In the game, use the controls below. Follow the Primary Objective shown on the left, travel to the highlighted station and complete its activity.
 5. Complete each day's objective before selecting **Complete Day**. Finish Day 7 and run the mission assessment.
 
@@ -53,7 +53,7 @@ The current third-person character is procedurally modelled with articulated lim
 
 The player earns Commander XP for completing mission days, finishing onboarding and collecting planetary samples. One-time achievements include First Commander, Lunar Field Scientist, Mars Field Scientist, First Light Graduate and Mars Expedition Complete. Guest rewards persist in this browser; signed-in rewards are included in the account's server-backed mission save when the Cloudflare Worker is deployed.
 
-Open the **Crew** section to view Commander XP and unlocked badges.
+Open the **Crew** section to meet the fixed mission roster: **Al-Amin** (Commander), **Imran** (Pilot), **Shuaib** (Systems Engineer) and **Jafar** (Science Specialist), plus Commander XP and unlocked badges.
 
 ## Player themes and accounts
 
@@ -65,15 +65,22 @@ Open **More → Settings** to choose one of three live themes:
 
 Guest play is available and stores progress in the current browser. Create an account from the profile/account screen to enable server-backed profile, save and mission-event synchronisation **after the Cloudflare Worker/API has been deployed and configured**. Guest data does not synchronise across devices.
 
-The V3.5 account API uses a secure HttpOnly session cookie, PBKDF2 password hashing, per-email failed-login throttling, and user-keyed Durable Objects for saves and events. The current build does **not** include email verification, email-based password reset, or Web Push delivery after the browser is completely closed. Browser notifications can be enabled for important events while the tab is in the background; live events can reach another active signed-in session over WebSocket.
+The account API uses a secure HttpOnly session cookie, PBKDF2 password hashing, per-email failed-login throttling, and user-keyed Durable Objects for saves and events. The current build does **not** include email verification, email-based password reset, or Web Push delivery after the browser is completely closed. Browser notifications can be enabled for important events while the tab is in the background; live events can reach another active signed-in session over WebSocket.
 
-## V3.5 startup and mobile notes
+## V3.6 release and mobile notes
 
-- The new tutorial uses a separate `ksa-outpost-86-onboarding-v35` completion key so existing players receive the hands-on tutorial once.
-- Babylon.js is dynamically imported after the UI shell renders.
-- Compact screens automatically start in Performance mode; users can opt into Balanced or High manually. The service worker precaches only the light app shell; large planetary textures are cached on demand after a world is selected.
+- The three-step tutorial remains skippable and can be replayed from Settings. Existing completion is preserved.
+- Babylon.js is dynamically imported after the UI shell renders. Mars albedo, normal and roughness textures are loaded only when the Mars world is selected.
+- Compact screens automatically start in Performance mode; users can opt into Balanced or High manually. The service worker precaches only the light app shell, uses network-first navigation so Android receives new HTML releases, and never caches API responses. Large planetary textures are loaded on demand.
 - The render loop pauses when the app is on non-game screens or the browser tab is hidden, saving battery and GPU time.
-- Home includes a **5-minute demo** entry that assembles the standard Mars rocket and opens the launch flow.
+- Home leads with **Play now · 5-minute demo**, which assembles the standard Mars rocket and opens the launch flow. Custom rocket assembly and solar-system exploration remain available as secondary actions.
+
+## V3.6 visual polish
+
+- Notification drawer close and mission-journal actions work; non-action clicks inside the panel no longer trigger the backdrop.
+- The KSA brand mark is an original orbital emblem.
+- Solar-system preview includes animated Earth and Mars relay satellites plus a slowly drifting asteroid belt.
+- The new Mars regolith albedo, normal and roughness maps are original procedural textures, not NASA-provided measurements.
 
 ## Technology
 
