@@ -1,9 +1,14 @@
-import type { BabylonWorld, CameraMode, GraphicsQuality, Planet, Interactable } from './babylonWorld';
+import type { BabylonWorld, CameraMode, GraphicsQuality, Planet, Interactable, SceneMode, RocketConfiguration } from './babylonWorld';
 
 export function createCanvasFallback(canvas: HTMLCanvasElement, reducedMotion: boolean): BabylonWorld {
   const context = canvas.getContext('2d', { alpha: false });
   if (!context) throw new Error('Neither Babylon.js nor the 2D canvas fallback could initialise.');
   let planet: Planet = 'mars';
+  let sceneMode: SceneMode = 'planetary';
+  let rocketConfiguration: RocketConfiguration = { crewCapsule: true, mainEngine: true, fuelTank: true, booster: true, landingLegs: true, sciencePayload: true, communications: true };
+  let rocketLiftStart = 0;
+  let rocketLiftCallback: (() => void) | undefined;
+  let solarFocus = 'earth';
   let quality: GraphicsQuality = 'medium';
   let paused = false;
   let reduced = reducedMotion;
@@ -116,6 +121,8 @@ export function createCanvasFallback(canvas: HTMLCanvasElement, reducedMotion: b
     if (!lastTime) lastTime = time;
     const delta = Math.min(0.05, (time - lastTime) / 1000);
     lastTime = time;
+    if (sceneMode === 'solar' && !journeyTarget) { drawSolarScene(time / 1000); return; }
+    if (sceneMode === 'rocket' && !journeyTarget) { drawRocketScene(time / 1000); return; }
     if (journeyTarget && !paused) {
       const progress = Math.min(1, (time - journeyStart) / 6500);
       drawEarthScene(progress);
@@ -159,6 +166,30 @@ export function createCanvasFallback(canvas: HTMLCanvasElement, reducedMotion: b
     context.fillStyle = '#b96d48'; context.beginPath(); context.moveTo(-25, -7); context.lineTo(-38, 0); context.lineTo(-25, 7); context.fill();
     context.fillStyle = '#f5a35b'; context.beginPath(); context.moveTo(-28, -3); context.lineTo(-48, 0); context.lineTo(-28, 3); context.fill(); context.restore();
     context.fillStyle = 'rgba(255,246,231,.9)'; context.font = '10px monospace'; context.fillText(`${journeyTarget?.toUpperCase() ?? 'DESTINATION'} TRANSIT · ${Math.round(progress * 100)}%`, 24, height - 38);
+  };
+
+  const drawSolarScene = (time: number): void => {
+    const g = context.createLinearGradient(0, 0, 0, height); g.addColorStop(0, '#061326'); g.addColorStop(1, '#1b3150');
+    context.fillStyle = g; context.fillRect(0, 0, width, height);
+    stars.forEach((star) => { const twinkle = .45 + .3 * Math.sin(time * 1.2 + star.x * 30); context.fillStyle = `rgba(255,255,255,${twinkle})`; context.beginPath(); context.arc(star.x * width, star.y * height, star.r + .5, 0, Math.PI*2); context.fill(); });
+    const cx = width * .5, cy = height * .48; const scale = Math.min(width, height) / 520;
+    const sun = context.createRadialGradient(cx,cy,5,cx,cy,48*scale); sun.addColorStop(0,'#fff5b0'); sun.addColorStop(.42,'#ffb34f'); sun.addColorStop(1,'rgba(255,110,34,0)'); context.fillStyle=sun; context.beginPath(); context.arc(cx,cy,55*scale,0,Math.PI*2); context.fill();
+    const bodies = [{name:'earth',r:8,c:'#428db8',orbit:92,speed:.34},{name:'moon',r:3,c:'#c6c4bb',orbit:112,speed:.32},{name:'mars',r:6,c:'#bd694b',orbit:143,speed:.24},{name:'jupiter',r:17,c:'#cba77d',orbit:190,speed:.13},{name:'saturn',r:14,c:'#ddc49b',orbit:238,speed:.09}];
+    bodies.forEach((b) => { const a=time*b.speed+(b.name==='moon'?1.1:b.name==='mars'?2.3:b.name==='jupiter'?3.2:b.name==='saturn'?4.2:0); const x=cx+Math.cos(a)*b.orbit*scale; const y=cy+Math.sin(a)*b.orbit*.34*scale; context.strokeStyle='rgba(197,214,242,.18)'; context.beginPath(); context.ellipse(cx,cy,b.orbit*scale,b.orbit*.34*scale,0,0,Math.PI*2); context.stroke(); context.fillStyle=b.c; context.beginPath(); context.arc(x,y,b.r*scale,0,Math.PI*2); context.fill(); if(b.name==='saturn'){context.strokeStyle='rgba(244,221,183,.7)';context.lineWidth=2;context.beginPath();context.ellipse(x,y,b.r*1.65*scale,b.r*.6*scale,-.3,0,Math.PI*2);context.stroke();} });
+    const shipX = cx + Math.sin(time*.55)*width*.34; const shipY = cy - 90*scale + Math.cos(time*.55)*20*scale; context.save();context.translate(shipX,shipY);context.rotate(Math.sin(time*.55)*.12);context.fillStyle='#e7edf2';context.beginPath();context.moveTo(-16*scale,-4*scale);context.lineTo(14*scale,-4*scale);context.lineTo(21*scale,0);context.lineTo(14*scale,4*scale);context.lineTo(-16*scale,4*scale);context.fill();context.fillStyle='#ff9d47';context.fillRect(-22*scale,-2*scale,7*scale,4*scale);context.restore();
+    context.fillStyle='#f4eadb';context.font='600 13px sans-serif';context.fillText(`SOLAR SYSTEM · FOCUS ${solarFocus.toUpperCase()}`,18,28);
+  };
+
+  const drawRocketScene = (time: number): void => {
+    const sky=context.createLinearGradient(0,0,0,height);sky.addColorStop(0,'#0a2037');sky.addColorStop(1,'#42596b');context.fillStyle=sky;context.fillRect(0,0,width,height);
+    stars.forEach((star)=>{context.fillStyle='rgba(255,255,255,.62)';context.beginPath();context.arc(star.x*width,star.y*height*.75,star.r,0,Math.PI*2);context.fill();});
+    terrain(height*.79,'#293b42',1.2);const x=width*.49, base=height*.78, s=Math.min(1.15,width/780);
+    context.fillStyle='rgba(255,255,255,.1)';context.fillRect(x-72*s,base-190*s,144*s,190*s);
+    context.fillStyle='#d8dde0';context.fillRect(x-19*s,base-173*s,38*s,140*s);context.beginPath();context.moveTo(x-19*s,base-173*s);context.lineTo(x,base-220*s);context.lineTo(x+19*s,base-173*s);context.fill();
+    context.fillStyle='#8daebd';context.beginPath();context.arc(x,base-147*s,10*s,0,Math.PI*2);context.fill();
+    if(rocketConfiguration.booster){context.fillStyle='#c5cbd0';context.fillRect(x-31*s,base-112*s,9*s,96*s);context.fillRect(x+22*s,base-112*s,9*s,96*s);}
+    if(rocketConfiguration.mainEngine){const flicker=1+Math.sin(time*24)*.22;context.fillStyle='rgba(255,150,70,.8)';context.beginPath();context.moveTo(x-12*s,base-32*s);context.lineTo(x,base+42*s*flicker);context.lineTo(x+12*s,base-32*s);context.fill();}
+    context.fillStyle='#f5e9d9';context.font='600 13px sans-serif';context.fillText('ROCKET WORKSHOP · EXPEDITION MK-I',18,28);
   };
 
   const drawScene = (time: number, _delta: number): void => {
@@ -218,7 +249,16 @@ export function createCanvasFallback(canvas: HTMLCanvasElement, reducedMotion: b
   frame = requestAnimationFrame(drawFrame);
   return {
     rendererName: 'Canvas 2D fallback',
-    setPlanet(value) { planet = value; journeyTarget = null; },
+    setPlanet(value) { planet = value; sceneMode = 'planetary'; journeyTarget = null; },
+    setSceneMode(mode) { sceneMode = mode; journeyTarget = null; playerControlled = false; vehicleMode = false; },
+    focusCelestial(name) { solarFocus = name.toLowerCase(); },
+    setRocketConfiguration(config) { rocketConfiguration = { ...config }; },
+    launchRocket(destination, onComplete) {
+      if (sceneMode !== 'rocket' || !rocketConfiguration.crewCapsule || !rocketConfiguration.mainEngine || !rocketConfiguration.fuelTank || !rocketConfiguration.communications) return;
+      rocketLiftStart = performance.now(); rocketLiftCallback = onComplete;
+      const finish = (): void => { if (!rocketLiftStart) return; if (performance.now() - rocketLiftStart >= 2600) { rocketLiftStart = 0; sceneMode = 'planetary'; planet = 'earth'; rocketLiftCallback?.(); rocketLiftCallback = undefined; } else requestAnimationFrame(finish); };
+      requestAnimationFrame(finish); void destination;
+    },
     setPaused(value) { paused = value; },
     setGraphicsQuality(value) { quality = value; resize(); },
     setReducedMotion(value) { reduced = value; },
@@ -233,7 +273,8 @@ export function createCanvasFallback(canvas: HTMLCanvasElement, reducedMotion: b
     setVehicleInput(x, _y) { vehicleX = Math.max(-1, Math.min(1, x)); },
     enterHabitat() { playerX = 0; playerZ = 0; },
     exitHabitat() { playerX = 0; playerZ = 0; },
-    focusStation(_id) { cameraMode = 'habitat'; },
+    focusStation(id) { cameraMode = 'habitat'; solarFocus = id; },
+    activateStation(id) { solarFocus = id; },
     deployRover() { roverDeployed = true; roverX = Math.min(52, roverX + 16); },
     driveRover(direction) { if (roverDeployed) roverX = Math.max(-50, Math.min(50, roverX + Math.sign(direction) * 9)); },
     playJourney(destination, onComplete) { if (reduced) { planet = destination; onComplete?.(); return; } journeyTarget = destination; journeyStart = performance.now(); journeyCallback = onComplete; paused = false; },

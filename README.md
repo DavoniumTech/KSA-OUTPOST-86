@@ -1,16 +1,16 @@
-# KSA OUTPOST 86 — Version 3.0.0
+# KSA OUTPOST 86 — Version 3.5.0
 
 ## ORBITAL FRONTIER · A playable planetary adventure
 
-KSA OUTPOST 86 is an independent educational space-exploration game. Version 3 moves the experience beyond a command dashboard: players complete a three-step interactive 3D onboarding, select Earth/Moon/Mars, control an astronaut, explore a habitat, operate mission stations, board and drive a rover, scan a sample site, and progress through the existing lunar and Martian outpost campaigns.
+KSA OUTPOST 86 is an independent educational space-exploration game. Version 3.5 makes the experience faster to enter and clearer to play: players complete a three-step interactive 3D onboarding, select Earth/Moon/Mars, control an astronaut, explore a habitat, operate mission stations, board and drive a rover, scan a sample site, and progress through the existing lunar and Martian outpost campaigns.
 
 > **Educational notice:** This is an independent fictional training game. NASA has not endorsed, certified or approved it. Game resources, events and spacecraft journeys are simplified learning models, not operational specifications or live spacecraft telemetry.
 
 ## Play the game
 
-1. Open the application and choose **Enter the Universe**.
+1. Open the application. The new V3.5 onboarding appears once, even if an older tutorial was already completed. The first solar-system scene is lazy-loaded after the app shell.
 2. Complete the three onboarding steps: **Meet Your Crew**, **Choose Your Planet**, and **Learn to Command**. The final step teaches oxygen, power and water station interactions. Onboarding can be replayed from Settings.
-3. Choose **Start My Adventure**. Review the mission briefing and launch.
+3. After onboarding, choose **Build my rocket**. For a guided fast start, use **5-minute demo** on Home; it preselects Mars and assembles the standard rocket. Review the flight check and press **Launch Expedition**. You can also customise every rocket component.
 4. In the game, use the controls below. Follow the Primary Objective shown on the left, travel to the highlighted station and complete its activity.
 5. Complete each day's objective before selecting **Complete Day**. Finish Day 7 and run the mission assessment.
 
@@ -28,6 +28,8 @@ KSA OUTPOST 86 is an independent educational space-exploration game. Version 3 m
 | `Esc` | Pause / return to mission controls |
 
 ### Mobile controls
+
+Compact/mobile devices start in the Performance graphics profile to reduce first-world construction time and rendering cost. The user can switch to Balanced or High in Settings. The 3D renderer is a separate lazy-loaded bundle so the application shell and controls appear first.
 
 Use the on-screen virtual joystick to move or steer. Drag the scene to adjust the camera. Use the **INTERACT**, **JUMP**, **SCAN** and **EXIT ROVER** buttons when they are visible. Allow the scene to finish loading before moving.
 
@@ -63,7 +65,15 @@ Open **More → Settings** to choose one of three live themes:
 
 Guest play is available and stores progress in the current browser. Create an account from the profile/account screen to enable server-backed profile, save and mission-event synchronisation **after the Cloudflare Worker/API has been deployed and configured**. Guest data does not synchronise across devices.
 
-The account API uses a secure HttpOnly session cookie, PBKDF2 password hashing, per-email failed-login throttling, and user-keyed Durable Objects for saves and events. The current build does **not** include email verification, email-based password reset, or Web Push delivery after the browser is completely closed. Browser notifications can be enabled for important events while the tab is in the background; live events can reach another active signed-in session over WebSocket.
+The V3.5 account API uses a secure HttpOnly session cookie, PBKDF2 password hashing, per-email failed-login throttling, and user-keyed Durable Objects for saves and events. The current build does **not** include email verification, email-based password reset, or Web Push delivery after the browser is completely closed. Browser notifications can be enabled for important events while the tab is in the background; live events can reach another active signed-in session over WebSocket.
+
+## V3.5 startup and mobile notes
+
+- The new tutorial uses a separate `ksa-outpost-86-onboarding-v35` completion key so existing players receive the hands-on tutorial once.
+- Babylon.js is dynamically imported after the UI shell renders.
+- Compact screens automatically start in Performance mode; users can opt into Balanced or High manually. The service worker precaches only the light app shell; large planetary textures are cached on demand after a world is selected.
+- The render loop pauses when the app is on non-game screens or the browser tab is hidden, saving battery and GPU time.
+- Home includes a **5-minute demo** entry that assembles the standard Mars rocket and opens the launch flow.
 
 ## Technology
 

@@ -1,26 +1,24 @@
-KSA OUTPOST 86 — VERSION 3.0.0
-ORBITAL FRONTIER: THE NEXT GENERATION PLANETARY ADVENTURE GAME
+KSA OUTPOST 86 — VERSION 3.5.0
+ORBITAL FRONTIER: PREMIUM INTERACTIVE SPACE ADVENTURE
 
 Repository: https://github.com/DavoniumTech/KSA-OUTPOST-86.git
 Target branch: main
 
-Version 3 includes:
-- Three-step 3D onboarding: Meet Your Crew, Choose Your Planet, Learn to Command.
-- Earth, Moon and Mars planetary environments.
-- Babylon.js 9.35.0 via bundled npm dependency.
-- WebGPU preference, WebGL 2 fallback and Canvas fallback.
-- Third-person astronaut keyboard and mobile joystick controls.
-- Habitat entry and proximity-based station interactions.
-- Oxygen, solar-array and greenhouse interaction challenges.
-- Rover boarding, driving and proximity-based sample scanning.
-- Commander XP, persistent achievement badges and mission reward feedback.
-- Light Explorer, Dark Cosmos and Glass Blue themes.
-- Guest mode, account UI and Cloudflare Worker account/save/live-event API.
-- Existing lunar and Mars mission logic, local saves, Mission Control, audio and Lunar Lander Lab retained.
+V3.5 player-experience updates:
+- New once-per-player V3.5 tutorial key; old tutorial completion no longer skips the hands-on flow.
+- App shell renders before the dynamically imported Babylon.js engine chunk.
+- Compact/mobile devices default to the Performance graphics profile.
+- Solar-system star/orbit geometry is reduced on Performance mode.
+- Avoids the duplicate solar-system rebuild during initial renderer hand-off.
+- Stops the GPU render loop while the app is paused or the browser tab is hidden.
+- Adds a one-tap 5-minute Mars demo that prebuilds the standard rocket.
+- Keeps the full 3D Earth, Moon and Mars scenes, rocket launch, third-person controls, habitat interactions, rover and seven-day mission loops.
+- Crew manifest: Amara Okafor, Muhammad Imran, Shuaib and Jafar.
+- Fixed full-width header and navigation; larger mobile typography and onboarding viewport.
+- Existing lunar/Mars mission logic, saves, Mission Control, audio and Lunar Lander Lab retained.
 
-Build: npm ci; npm run typecheck; npm test; npm run build
+Commands: npm ci; npm run typecheck; npm test; npm run build
 
-IMPORTANT SERVICE REQUIREMENTS:
-The account, server-save and WebSocket services require the Cloudflare Worker deployment and its Durable Object bindings. Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to GitHub Actions repository secrets to enable the optional Cloudflare deployment job. Browser alerts are supported while the tab is in the background; closed-browser Web Push is not implemented. Email verification and email-based password reset are not implemented in this release.
+The account, cloud-save and live-session services require the Cloudflare Worker deployment and Durable Object bindings. Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as GitHub Actions repository secrets for the optional Cloudflare deployment job. Browser notifications are supported while the tab is in the background; closed-browser Web Push, email verification and email-based password reset are not implemented.
 
-This is an independent educational simulation and is not endorsed or certified by NASA. Terrain and 3D assets are procedural game assets unless an explicit source and licence are listed in the asset credits.
+This is an independent educational simulation and is not endorsed or certified by NASA. Terrain and spacecraft visuals are procedural game assets unless an explicit source and licence are listed in the asset credits.

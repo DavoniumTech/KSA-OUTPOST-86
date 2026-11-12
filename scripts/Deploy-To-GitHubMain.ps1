@@ -247,7 +247,7 @@ try {
         throw "Potential secret files are staged. Deployment stopped: $($secretFiles -join ', ')"
     }
 
-    Invoke-Git -Arguments @('commit', '-m', 'feat: KSA Outpost 86 v3 Orbital Frontier game experience') | Out-Null
+    Invoke-Git -Arguments @('commit', '-m', 'feat: KSA Outpost 86 v3.5 fast-start planetary adventure') | Out-Null
     Invoke-Git -Arguments @('push', 'origin', 'main') | Out-Null
 
     $localHead = (Invoke-Git -Arguments @('rev-parse', 'HEAD') | Select-Object -First 1).Trim()

@@ -1,14 +1,17 @@
-// @ts-ignore -- The pinned Babylon.js package is installed by npm ci for production builds.
-import * as Babylon from '@babylonjs/core/Legacy/legacy';
-
 export type Planet = 'earth' | 'moon' | 'mars';
 export type GraphicsQuality = 'low' | 'medium' | 'high';
 export type CameraMode = 'overview' | 'habitat' | 'rover' | 'horizon';
+export type SceneMode = 'solar' | 'rocket' | 'planetary';
+export interface RocketConfiguration { crewCapsule: boolean; mainEngine: boolean; fuelTank: boolean; booster: boolean; landingLegs: boolean; sciencePayload: boolean; communications: boolean }
 
 export interface Interactable { id: string; title: string; description: string }
 
 export interface BabylonWorld {
   setPlanet(planet: Planet): void;
+  setSceneMode(mode: SceneMode): void;
+  focusCelestial(name: string): void;
+  setRocketConfiguration(config: RocketConfiguration): void;
+  launchRocket(destination: Planet, onComplete?: () => void): void;
   setPaused(paused: boolean): void;
   setGraphicsQuality(quality: GraphicsQuality): void;
   setReducedMotion(reduced: boolean): void;
@@ -26,6 +29,7 @@ export interface BabylonWorld {
   enterHabitat(): void;
   exitHabitat(): void;
   focusStation(id: string): void;
+  activateStation(id: string): void;
   playJourney(destination: Planet, onComplete?: () => void): void;
   destroy(): void;
   readonly rendererName: string;
@@ -35,11 +39,16 @@ interface WorldOptions {
   baseUrl: string;
   quality: GraphicsQuality;
   reducedMotion: boolean;
+  initialMode?: SceneMode;
+  rocketConfiguration?: RocketConfiguration;
+  preferWebGPU?: boolean;
 }
 
-function loadBabylon(): Promise<any> {
-  // The engine is bundled by Vite from the pinned npm dependency. No runtime CDN script is required.
-  return Promise.resolve(Babylon as any);
+async function loadBabylon(): Promise<any> {
+  // Split the 3D engine into its own chunk so the app shell and controls render first.
+  // @ts-ignore -- Installed from the pinned package during npm ci.
+  const module = await import('@babylonjs/core/Legacy/legacy');
+  return module as any;
 }
 
 function hash(x: number, z: number, seed = 1): number {
@@ -172,17 +181,18 @@ function material(B: any, scene: any, name: string, color: string, roughness = 0
   return mat;
 }
 
-function createStars(B: any, scene: any): void {
+function createStars(B: any, scene: any, quality: GraphicsQuality): void {
   const starMaterial = new B.StandardMaterial('star-mat', scene);
   starMaterial.emissiveColor = new B.Color3(0.82, 0.88, 1);
   const seed = B.MeshBuilder.CreateSphere('star-seed', { diameter: 0.085, segments: 4 }, scene);
   seed.material = starMaterial;
   seed.position.set(1000, 1000, 1000);
-  for (let i = 0; i < 260; i += 1) {
+  const starCount = quality === 'low' ? 105 : quality === 'medium' ? 180 : 260;
+  for (let i = 0; i < starCount; i += 1) {
     const star = seed.createInstance(`star-${i}`);
     const theta = hash(i, 3, 9) * Math.PI * 2;
     const phi = Math.acos(2 * hash(i, 11, 4) - 1);
-    const radius = 115 + hash(i, 8, 3) * 35;
+    const radius = 220 + hash(i, 8, 3) * 90;
     star.position.set(radius * Math.sin(phi) * Math.cos(theta), radius * Math.cos(phi), radius * Math.sin(phi) * Math.sin(theta));
     const size = 0.45 + hash(i, 14, 5) * 1.5;
     star.scaling.setAll(size);
@@ -575,6 +585,266 @@ function createSpacecraft(B: any, scene: any, x: number, z: number): any {
 }
 
 
+function createSolarSystem(B: any, scene: any, quality: GraphicsQuality): { bodies: Map<string, any>; pivots: Array<{ node: any; speed: number; mesh: any }> } {
+  const bodies = new Map<string, any>();
+  const pivots: Array<{ node: any; speed: number; mesh: any }> = [];
+  const sun = B.MeshBuilder.CreateSphere('solar-sun', { diameter: 17, segments: quality === 'low' ? 24 : 48 }, scene);
+  const sunMat = new B.StandardMaterial('solar-sun-material', scene);
+  sunMat.emissiveColor = new B.Color3(1, 0.48, 0.12);
+  sunMat.diffuseColor = new B.Color3(0.9, 0.33, 0.07);
+  sunMat.disableLighting = true;
+  sun.material = sunMat;
+  const corona = B.MeshBuilder.CreateSphere('solar-sun-corona', { diameter: 19.5, segments: 32 }, scene);
+  const coronaMat = new B.StandardMaterial('solar-sun-corona-material', scene);
+  coronaMat.emissiveColor = new B.Color3(1, 0.28, 0.06);
+  coronaMat.alpha = 0.18;
+  coronaMat.backFaceCulling = false;
+  corona.material = coronaMat;
+  const sunlight = new B.PointLight('solar-system-star-light', B.Vector3.Zero(), scene);
+  sunlight.diffuse = new B.Color3(1, 0.83, 0.64);
+  sunlight.intensity = 2.4;
+  sunlight.range = 280;
+  if (quality !== 'low') try {
+    const glow = new B.GlowLayer('solar-system-glow', scene, { blurKernelSize: quality === 'high' ? 48 : 24 });
+    glow.intensity = quality === 'high' ? 0.58 : 0.44;
+    glow.addIncludedOnlyMesh(sun);
+    glow.addIncludedOnlyMesh(corona);
+  } catch { /* The basic emissive sun remains visible if glow is unavailable. */ }
+
+  const planets = [
+    { id: 'mercury', label: 'Mercury', orbit: 20, size: 1.05, color: '#a99c8b', speed: 0.21 },
+    { id: 'venus', label: 'Venus', orbit: 29, size: 1.8, color: '#d7ad79', speed: 0.15 },
+    { id: 'earth', label: 'Earth', orbit: 41, size: 2.05, color: '#347fa8', speed: 0.105 },
+    { id: 'mars', label: 'Mars', orbit: 54, size: 1.45, color: '#bc6444', speed: 0.082 },
+    { id: 'jupiter', label: 'Jupiter', orbit: 76, size: 6.4, color: '#bd9d7c', speed: 0.047 },
+    { id: 'saturn', label: 'Saturn', orbit: 101, size: 5.2, color: '#d4bb87', speed: 0.033 },
+    { id: 'uranus', label: 'Uranus', orbit: 124, size: 3.3, color: '#83c2ca', speed: 0.024 },
+    { id: 'neptune', label: 'Neptune', orbit: 145, size: 3.1, color: '#416cae', speed: 0.018 },
+  ];
+  const ringMaterial = new B.StandardMaterial('solar-orbit-line-material', scene);
+  ringMaterial.emissiveColor = new B.Color3(0.19, 0.31, 0.43);
+  ringMaterial.alpha = 0.32;
+  ringMaterial.disableLighting = true;
+  for (const definition of planets) {
+    const orbit = B.MeshBuilder.CreateTorus(`${definition.id}-orbit`, { diameter: definition.orbit * 2, thickness: 0.045, tessellation: quality === 'low' ? 48 : quality === 'medium' ? 80 : 128 }, scene);
+    orbit.rotation.x = Math.PI / 2;
+    orbit.material = ringMaterial;
+    const pivot = new B.TransformNode(`${definition.id}-orbital-pivot`, scene);
+    const planetMesh = B.MeshBuilder.CreateSphere(`solar-planet-${definition.id}`, { diameter: definition.size, segments: quality === 'low' ? 16 : quality === 'medium' ? 24 : 40 }, scene);
+    planetMesh.position.x = definition.orbit;
+    planetMesh.parent = pivot;
+    const planetMat = new B.StandardMaterial(`${definition.id}-material`, scene);
+    planetMat.diffuseColor = B.Color3.FromHexString(definition.color);
+    planetMat.specularColor = new B.Color3(0.18, 0.2, 0.24);
+    planetMat.specularPower = 28;
+    planetMesh.material = planetMat;
+    if (definition.id === 'earth') {
+      const cloud = B.MeshBuilder.CreateSphere('solar-earth-clouds', { diameter: definition.size * 1.035, segments: 24 }, scene);
+      const cloudMat = new B.StandardMaterial('solar-earth-cloud-material', scene);
+      cloudMat.diffuseColor = new B.Color3(0.86, 0.94, 1);
+      cloudMat.alpha = 0.18;
+      cloudMat.backFaceCulling = false;
+      cloud.material = cloudMat;
+      cloud.parent = planetMesh;
+      cloud.position.setAll(0);
+      const atmosphere = B.MeshBuilder.CreateSphere('solar-earth-atmosphere', { diameter: definition.size * 1.13, segments: 24 }, scene);
+      const atmosphereMat = new B.StandardMaterial('solar-earth-atmosphere-material', scene);
+      atmosphereMat.emissiveColor = new B.Color3(0.04, 0.34, 0.82);
+      atmosphereMat.alpha = 0.13;
+      atmosphereMat.backFaceCulling = false;
+      atmosphere.material = atmosphereMat;
+      atmosphere.parent = planetMesh;
+      atmosphere.position.setAll(0);
+      // Earth's moon follows the Earth in its own small orbit.
+      const moonOrbit = B.MeshBuilder.CreateTorus('solar-moon-orbit', { diameter: 7.8, thickness: 0.025, tessellation: 64 }, scene);
+      moonOrbit.parent = planetMesh;
+      moonOrbit.rotation.x = Math.PI / 2;
+      moonOrbit.material = ringMaterial;
+      const moonPivot = new B.TransformNode('solar-moon-pivot', scene);
+      moonPivot.parent = planetMesh;
+      const moonMesh = B.MeshBuilder.CreateSphere('solar-planet-moon', { diameter: 0.62, segments: 16 }, scene);
+      moonMesh.position.x = 3.8;
+      moonMesh.parent = moonPivot;
+      const moonMat = new B.StandardMaterial('solar-moon-material', scene);
+      moonMat.diffuseColor = new B.Color3(0.62, 0.63, 0.6);
+      moonMesh.material = moonMat;
+      bodies.set('moon', moonMesh);
+      pivots.push({ node: moonPivot, speed: 0.42, mesh: moonMesh });
+      // A compact communications satellite, visibly orbiting Earth.
+      const satellitePivot = new B.TransformNode('earth-communications-satellite-orbit', scene);
+      satellitePivot.parent = planetMesh;
+      const satellite = new B.TransformNode('earth-communications-satellite', scene);
+      satellite.parent = satellitePivot;
+      satellite.position.x = 5.3;
+      const satelliteBody = B.MeshBuilder.CreateBox('earth-satellite-bus', { width: 0.8, height: 0.62, depth: 0.62 }, scene);
+      satelliteBody.parent = satellite;
+      satelliteBody.material = planetMat;
+      for (const side of [-1, 1]) {
+        const solarWing = B.MeshBuilder.CreateBox(`earth-satellite-wing-${side}`, { width: 1.9, height: 0.05, depth: 0.66 }, scene);
+        solarWing.position.x = side * 1.25;
+        solarWing.parent = satellite;
+        const wingMat = new B.StandardMaterial(`earth-satellite-wing-material-${side}`, scene);
+        wingMat.diffuseColor = new B.Color3(0.1, 0.3, 0.57);
+        wingMat.emissiveColor = new B.Color3(0.015, 0.045, 0.085);
+        solarWing.material = wingMat;
+      }
+      pivots.push({ node: satellitePivot, speed: 0.78, mesh: satellite });
+    }
+    if (definition.id === 'saturn') {
+      const rings = B.MeshBuilder.CreateTorus('saturn-visible-rings', { diameter: definition.size * 2.05, thickness: 0.72, tessellation: 72 }, scene);
+      rings.parent = planetMesh;
+      rings.position.setAll(0);
+      rings.rotation.x = 0.26;
+      const ringsMat = new B.StandardMaterial('saturn-rings-material', scene);
+      ringsMat.diffuseColor = new B.Color3(0.74, 0.63, 0.46);
+      ringsMat.alpha = 0.76;
+      rings.material = ringsMat;
+    }
+    bodies.set(definition.id, planetMesh);
+    pivots.push({ node: pivot, speed: definition.speed, mesh: planetMesh });
+  }
+
+  // A loose, low-poly asteroid belt between Mars and Jupiter.
+  const asteroidMat = new B.StandardMaterial('asteroid-belt-material', scene);
+  asteroidMat.diffuseColor = new B.Color3(0.45, 0.42, 0.39);
+  asteroidMat.roughness = 1;
+  const seed = B.MeshBuilder.CreatePolyhedron('asteroid-belt-seed', { type: 2, size: 0.42 }, scene);
+  seed.material = asteroidMat;
+  seed.setEnabled(false);
+  const asteroidCount = quality === 'low' ? 36 : quality === 'medium' ? 68 : 105;
+  for (let i = 0; i < asteroidCount; i += 1) {
+    const angle = hash(i, 6, 17) * Math.PI * 2;
+    const radius = 64 + hash(i, 9, 14) * 6;
+    const asteroid = seed.createInstance(`asteroid-${i}`);
+    asteroid.position.set(Math.cos(angle) * radius, (hash(i, 3, 8) - 0.5) * 3.8, Math.sin(angle) * radius);
+    const scale = 0.35 + hash(i, 5, 21) * 1.4;
+    asteroid.scaling.set(scale * (0.7 + hash(i, 4, 6)), scale, scale * (0.8 + hash(i, 12, 4)));
+    asteroid.rotation.set(hash(i, 14, 3), hash(i, 19, 4), hash(i, 2, 9));
+  }
+
+  // Small transfer craft on an orbit that crosses the inner planets.
+  const shipPivot = new B.TransformNode('solar-transfer-ship-orbit', scene);
+  const ship = B.MeshBuilder.CreateCapsule('solar-transfer-craft', { height: 5.4, radius: 0.68, tessellation: 16 }, scene);
+  ship.parent = shipPivot;
+  ship.position.set(46, 1.6, 0);
+  ship.rotation.z = Math.PI / 2;
+  const shipMat = new B.StandardMaterial('solar-transfer-craft-material', scene);
+  shipMat.diffuseColor = new B.Color3(0.84, 0.86, 0.84);
+  shipMat.emissiveColor = new B.Color3(0.05, 0.045, 0.035);
+  ship.material = shipMat;
+  const shipGlow = new B.PointLight('solar-transfer-craft-light', new B.Vector3(0, 0, -2), scene);
+  shipGlow.parent = ship;
+  shipGlow.intensity = 0.45;
+  shipGlow.range = 12;
+  pivots.push({ node: shipPivot, speed: 0.12, mesh: ship });
+
+  const sunHalo = B.MeshBuilder.CreateTorus('solar-system-sun-halo', { diameter: 22, thickness: 0.07, tessellation: 96 }, scene);
+  sunHalo.material = coronaMat;
+  sunHalo.rotation.x = Math.PI / 2.3;
+  return { bodies, pivots };
+}
+
+function createRocketWorkshop(B: any, scene: any, config: RocketConfiguration, quality: GraphicsQuality): { root: any; exhaust: any } {
+  const floor = B.MeshBuilder.CreateGround('rocket-workshop-floor', { width: 150, height: 130, subdivisions: quality === 'low' ? 12 : 24 }, scene);
+  floor.position.y = -0.4;
+  floor.material = material(B, scene, 'rocket-workshop-floor-material', '#263744', 0.78, 0.22);
+  const pad = B.MeshBuilder.CreateCylinder('rocket-launch-platform', { diameter: 22, height: 1.2, tessellation: 64 }, scene);
+  pad.position.y = 0.2;
+  pad.material = material(B, scene, 'rocket-launch-platform-material', '#71828a', 0.42, 0.62);
+  const padTop = B.MeshBuilder.CreateCylinder('rocket-launch-platform-top', { diameter: 17.5, height: 0.12, tessellation: 64 }, scene);
+  padTop.position.y = 0.86;
+  padTop.material = material(B, scene, 'rocket-launch-platform-top-material', '#d5d4ca', 0.62, 0.22);
+  const towerMat = material(B, scene, 'rocket-tower-material', '#71808a', 0.55, 0.55);
+  const tower = new B.TransformNode('rocket-service-tower', scene);
+  tower.position.set(10.5, 0, -1.5);
+  for (const x of [-1.8, 1.8]) for (const z of [-1.8, 1.8]) {
+    const leg = B.MeshBuilder.CreateBox(`rocket-tower-leg-${x}-${z}`, { width: 0.35, height: 31, depth: 0.35 }, scene);
+    leg.position.set(x, 15.5, z); leg.material = towerMat; leg.parent = tower;
+  }
+  for (let level = 4; level <= 28; level += 4) {
+    const beam = B.MeshBuilder.CreateBox(`rocket-tower-beam-${level}`, { width: 4, height: 0.24, depth: 4 }, scene);
+    beam.position.y = level; beam.material = towerMat; beam.parent = tower;
+  }
+  const rocket = new B.TransformNode('customisable-expedition-rocket', scene);
+  rocket.position.set(-1.5, 1.1, 0.3);
+  const hull = material(B, scene, 'rocket-hull-material', '#e7e5db', 0.32, 0.42);
+  const dark = material(B, scene, 'rocket-carbon-material', '#344552', 0.54, 0.58);
+  const orange = material(B, scene, 'rocket-marking-material', '#cf7047', 0.44, 0.32);
+  const stripe = material(B, scene, 'rocket-stripe-material', '#efb879', 0.47, 0.22);
+  const core = B.MeshBuilder.CreateCylinder('rocket-main-stage', { height: 18, diameterTop: 2.05, diameterBottom: 2.45, tessellation: 48 }, scene);
+  core.position.y = 11.8; core.material = hull; core.parent = rocket;
+  if (config.fuelTank) {
+    const tankBand = B.MeshBuilder.CreateCylinder('rocket-fuel-band', { height: 0.58, diameterTop: 2.08, diameterBottom: 2.32, tessellation: 48 }, scene);
+    tankBand.position.y = 8.1; tankBand.material = orange; tankBand.parent = rocket;
+    const tankLabel = B.MeshBuilder.CreateCylinder('rocket-fuel-label-band', { height: 0.16, diameter: 2.34, tessellation: 48 }, scene);
+    tankLabel.position.y = 14.5; tankLabel.material = stripe; tankLabel.parent = rocket;
+  }
+  if (config.crewCapsule) {
+    const capsule = B.MeshBuilder.CreateCylinder('rocket-crew-capsule', { height: 3.8, diameterTop: 0.12, diameterBottom: 2.0, tessellation: 48 }, scene);
+    capsule.position.y = 22.4; capsule.material = dark; capsule.parent = rocket;
+    const nose = B.MeshBuilder.CreateSphere('rocket-capsule-crown', { diameter: 1.72, segments: 24 }, scene);
+    nose.position.y = 24.1; nose.scaling.y = 0.8; nose.material = orange; nose.parent = rocket;
+    const porthole = B.MeshBuilder.CreateSphere('rocket-capsule-window', { diameter: 0.65, segments: 20 }, scene);
+    porthole.position.set(0, 22.65, -0.86); porthole.scaling.z = 0.26; porthole.material = material(B, scene, 'rocket-window-material', '#5ca3bd', 0.16, 0.55); porthole.parent = rocket;
+  }
+  if (config.mainEngine) {
+    const nozzle = B.MeshBuilder.CreateCylinder('rocket-main-nozzle', { height: 2.5, diameterTop: 0.88, diameterBottom: 1.55, tessellation: 32 }, scene);
+    nozzle.position.y = 1.6; nozzle.material = dark; nozzle.parent = rocket;
+    for (let i = -1; i <= 1; i += 1) {
+      const engine = B.MeshBuilder.CreateCylinder(`rocket-engine-bell-${i}`, { height: 1.7, diameterTop: 0.38, diameterBottom: 0.68, tessellation: 24 }, scene);
+      engine.position.set(i * 0.65, 0.4, 0); engine.material = dark; engine.parent = rocket;
+    }
+  }
+  if (config.booster) for (const side of [-1, 1]) {
+    const booster = B.MeshBuilder.CreateCylinder(`rocket-side-booster-${side}`, { height: 13.8, diameterTop: 0.68, diameterBottom: 0.92, tessellation: 32 }, scene);
+    booster.position.set(side * 1.85, 8.7, 0); booster.material = hull; booster.parent = rocket;
+    const boosterTip = B.MeshBuilder.CreateCylinder(`rocket-booster-nose-${side}`, { height: 1.45, diameterTop: 0, diameterBottom: 0.68, tessellation: 24 }, scene);
+    boosterTip.position.set(side * 1.85, 16.3, 0); boosterTip.material = orange; boosterTip.parent = rocket;
+    const boosterNozzle = B.MeshBuilder.CreateCylinder(`rocket-booster-nozzle-${side}`, { height: 1.25, diameterTop: 0.36, diameterBottom: 0.72, tessellation: 20 }, scene);
+    boosterNozzle.position.set(side * 1.85, 1.15, 0); boosterNozzle.material = dark; boosterNozzle.parent = rocket;
+  }
+  for (let side = 0; side < 3; side += 1) {
+    const fin = B.MeshBuilder.CreateBox(`rocket-fin-${side}`, { width: 0.2, height: 2.6, depth: 1.55 }, scene);
+    const angle = side * (Math.PI * 2 / 3);
+    fin.position.set(Math.sin(angle) * 1.05, 3.1, Math.cos(angle) * 1.05);
+    fin.rotation.y = angle; fin.material = orange; fin.parent = rocket;
+  }
+  if (config.landingLegs) for (const side of [-1, 1]) {
+    const leg = B.MeshBuilder.CreateCylinder(`rocket-landing-leg-${side}`, { height: 2.7, diameter: 0.12, tessellation: 12 }, scene);
+    leg.position.set(side * 1.45, 1.4, 0.1); leg.rotation.z = side * -0.55; leg.material = dark; leg.parent = rocket;
+    const foot = B.MeshBuilder.CreateBox(`rocket-landing-foot-${side}`, { width: 1.5, height: 0.12, depth: 0.68 }, scene);
+    foot.position.set(side * 2.05, 0.2, 0.1); foot.material = orange; foot.parent = rocket;
+  }
+  if (config.sciencePayload) {
+    const payload = B.MeshBuilder.CreateCylinder('rocket-science-payload', { height: 1.7, diameter: 1.1, tessellation: 24 }, scene);
+    payload.position.set(1.3, 13.2, 0.4); payload.material = stripe; payload.parent = rocket;
+  }
+  if (config.communications) {
+    const dish = B.MeshBuilder.CreateSphere('rocket-communications-dish', { diameter: 0.95, segments: 16 }, scene);
+    dish.position.set(-1.3, 16.5, 0.1); dish.scaling.set(1, 0.3, 0.85); dish.material = stripe; dish.parent = rocket;
+  }
+  // Launch-service arms and safety lights make the workshop readable at a glance.
+  const arm = B.MeshBuilder.CreateBox('rocket-service-arm', { width: 9, height: 0.52, depth: 0.52 }, scene);
+  arm.position.set(7.1, 17.5, 0); arm.material = towerMat; arm.parent = tower;
+  const beacon = B.MeshBuilder.CreateSphere('rocket-workshop-beacon', { diameter: 0.8 }, scene);
+  beacon.position.set(10.5, 30.5, -1.5);
+  const beaconMat = new B.StandardMaterial('rocket-workshop-beacon-material', scene);
+  beaconMat.emissiveColor = new B.Color3(1, 0.24, 0.08); beaconMat.disableLighting = true; beacon.material = beaconMat;
+  const exhaustTexture = new B.DynamicTexture('rocket-exhaust-texture', { width: 64, height: 64 }, scene, false);
+  const ctx = exhaustTexture.getContext() as CanvasRenderingContext2D;
+  const gradient = ctx.createRadialGradient(32, 32, 1, 32, 32, 30);
+  gradient.addColorStop(0, 'rgba(255,245,214,0.95)'); gradient.addColorStop(0.34, 'rgba(255,159,69,0.55)'); gradient.addColorStop(1, 'rgba(219,83,31,0)');
+  ctx.fillStyle = gradient; ctx.fillRect(0, 0, 64, 64); exhaustTexture.update(false);
+  const exhaust = new B.ParticleSystem('rocket-launch-exhaust', quality === 'low' ? 320 : 700, scene);
+  exhaust.particleTexture = exhaustTexture;
+  exhaust.emitter = new B.Vector3(-1.5, 1.15, 0.3);
+  exhaust.minEmitBox = new B.Vector3(-1.25, -0.1, -1.1); exhaust.maxEmitBox = new B.Vector3(1.25, 0.2, 1.1);
+  exhaust.color1 = new B.Color4(1, 0.77, 0.35, 0.9); exhaust.color2 = new B.Color4(0.95, 0.28, 0.06, 0.62); exhaust.colorDead = new B.Color4(0.25, 0.2, 0.18, 0);
+  exhaust.minSize = 0.6; exhaust.maxSize = 2.7; exhaust.minLifeTime = 0.45; exhaust.maxLifeTime = 1.35; exhaust.emitRate = 0;
+  exhaust.direction1 = new B.Vector3(-0.35, -1, -0.3); exhaust.direction2 = new B.Vector3(0.35, -1, 0.3); exhaust.minEmitPower = 2; exhaust.maxEmitPower = 7; exhaust.updateSpeed = 0.012;
+  return { root: rocket, exhaust };
+}
+
 function createStationTerminal(B: any, scene: any, id: string, title: string, x: number, z: number, planet: Planet, color = '#d88a55', baseHeight?: number): void {
   const root = new B.TransformNode(`station-${id}`, scene);
   root.metadata = { title };
@@ -657,7 +927,7 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
   const B = await loadBabylon();
   let engine: any;
   let rendererName = 'WebGL 2';
-  if (B.WebGPUEngine && 'gpu' in navigator) {
+  if (options.preferWebGPU && B.WebGPUEngine && 'gpu' in navigator) {
     try {
       const candidate = new B.WebGPUEngine(canvas, { antialias: true, adaptToDeviceRatio: true });
       await candidate.initAsync();
@@ -672,6 +942,15 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
   let reducedMotion = options.reducedMotion;
   let paused = true;
   let planet: Planet = 'mars';
+  let sceneMode: SceneMode = options.initialMode ?? 'solar';
+  let rocketConfig: RocketConfiguration = { crewCapsule: true, mainEngine: true, fuelTank: true, booster: true, landingLegs: true, sciencePayload: true, communications: true, ...(options.rocketConfiguration ?? {}) };
+  let rocketRoot: any = null;
+  let rocketExhaust: any = null;
+  let rocketLaunchActive = false;
+  let rocketLaunchElapsed = 0;
+  let rocketLaunchCallback: (() => void) | undefined;
+  let solarBodies = new Map<string, any>();
+  let solarPivots: Array<{ node: any; speed: number; mesh: any }> = [];
   let scene: any;
   let camera: any;
   let roverRoot: any;
@@ -704,6 +983,8 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
   let playerAstronaut: any = null;
   const stationRecords: Array<{ id: string; title: string; description: string; position: any; radius: number }> = [];
   let nearbyInteractable: Interactable | null = null;
+  let activatedStationId = '';
+  let activatedStationAt = 0;
 
   const rebuildScene = (destination: Planet): void => {
     if (dustSystem) { try { dustSystem.stop(); } catch { /* disposed with scene */ } dustSystem = null; }
@@ -713,31 +994,47 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
     solarArrayRoots.length = 0;
     planet = destination;
     animationTime = 0;
+    rocketLaunchActive = false;
+    rocketLaunchElapsed = 0;
+    rocketLaunchCallback = undefined;
+    solarBodies = new Map<string, any>();
+    solarPivots = [];
+    rocketRoot = null;
+    rocketExhaust = null;
     scene = new B.Scene(engine);
-    scene.clearColor = destination === 'earth'
-      ? new B.Color4(0.025, 0.09, 0.16, 1)
-      : destination === 'mars'
-        ? new B.Color4(0.72, 0.52, 0.39, 1)
-        : new B.Color4(0.23, 0.24, 0.25, 1);
-    scene.fogMode = B.Scene.FOGMODE_EXP2;
-    scene.fogDensity = destination === 'mars' ? 0.0032 : destination === 'moon' ? 0.001 : 0;
-    scene.fogColor = destination === 'mars' ? new B.Color3(0.72, 0.52, 0.39) : new B.Color3(0.2, 0.22, 0.24);
-    camera = new B.ArcRotateCamera('frontier-camera', -Math.PI / 2.25, 1.12, destination === 'earth' ? 38 : 49, new B.Vector3(0, 1, 0), scene);
-    camera.lowerRadiusLimit = 10;
-    camera.upperRadiusLimit = 100;
-    camera.wheelPrecision = 28;
+    scene.clearColor = sceneMode === 'solar'
+      ? new B.Color4(0.012, 0.022, 0.052, 1)
+      : sceneMode === 'rocket'
+        ? new B.Color4(0.025, 0.055, 0.085, 1)
+        : destination === 'earth'
+          ? new B.Color4(0.025, 0.09, 0.16, 1)
+          : destination === 'mars'
+            ? new B.Color4(0.72, 0.52, 0.39, 1)
+            : new B.Color4(0.23, 0.24, 0.25, 1);
+    if (sceneMode === 'planetary') {
+      scene.fogMode = B.Scene.FOGMODE_EXP2;
+      scene.fogDensity = destination === 'mars' ? 0.0032 : destination === 'moon' ? 0.001 : 0;
+      scene.fogColor = destination === 'mars' ? new B.Color3(0.72, 0.52, 0.39) : new B.Color3(0.2, 0.22, 0.24);
+    } else {
+      scene.fogMode = B.Scene.FOGMODE_NONE;
+    }
+    const initialRadius = sceneMode === 'solar' ? 184 : sceneMode === 'rocket' ? 47 : destination === 'earth' ? 38 : 49;
+    camera = new B.ArcRotateCamera('frontier-camera', -Math.PI / 2.25, sceneMode === 'solar' ? 1.2 : 1.12, initialRadius, new B.Vector3(0, sceneMode === 'rocket' ? 12 : 1, 0), scene);
+    camera.lowerRadiusLimit = sceneMode === 'solar' ? 28 : 9;
+    camera.upperRadiusLimit = sceneMode === 'solar' ? 340 : 150;
+    camera.wheelPrecision = sceneMode === 'solar' ? 19 : 28;
     camera.panningSensibility = 75;
     camera.inertia = 0.84;
     camera.attachControl(canvas, true);
     camera.inputs.attached.pointers.buttons = [0, 1, 2];
     const hemi = new B.HemisphericLight('ambient-sky', new B.Vector3(0, 1, 0), scene);
-    hemi.intensity = destination === 'moon' ? 0.34 : 0.78;
+    hemi.intensity = sceneMode === 'solar' ? 0.44 : destination === 'moon' ? 0.34 : 0.78;
     hemi.groundColor = destination === 'mars' ? new B.Color3(0.22, 0.13, 0.1) : new B.Color3(0.16, 0.17, 0.2);
     const sun = new B.DirectionalLight('solar-key', new B.Vector3(-0.55, -1, 0.44), scene);
     sun.position = new B.Vector3(45, 70, -40);
-    sun.intensity = destination === 'moon' ? 2.45 : 1.8;
-    sun.shadowEnabled = quality !== 'low';
-    createStars(B, scene);
+    sun.intensity = sceneMode === 'solar' ? 0.55 : destination === 'moon' ? 2.45 : 1.8;
+    sun.shadowEnabled = sceneMode === 'planetary' && quality !== 'low';
+    createStars(B, scene, quality);
     dustSystem = createAtmosphericDust(B, scene, destination);
     roverRoot = undefined;
     roverWheels = [];
@@ -752,8 +1049,22 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
     sampleSitePosition = null;
     sampleBeacon = null;
     spacecraftRoot = undefined;
-
-    if (destination === 'earth') {
+    if (sceneMode === 'solar') {
+      const solar = createSolarSystem(B, scene, quality);
+      solarBodies = solar.bodies;
+      solarPivots = solar.pivots;
+      camera.setTarget(B.Vector3.Zero());
+      camera.radius = 184;
+    } else if (sceneMode === 'rocket') {
+      const workshop = createRocketWorkshop(B, scene, rocketConfig, quality);
+      rocketRoot = workshop.root;
+      rocketExhaust = workshop.exhaust;
+      camera.setTarget(new B.Vector3(-1, 13, 0));
+      camera.alpha = -Math.PI / 2.3;
+      camera.beta = 1.15;
+      camera.radius = 47;
+      // Make the rocket-service gantry and main vehicle visible in the first frame.
+    } else if (destination === 'earth') {
       const earth = B.MeshBuilder.CreateSphere('planet-earth', { diameter: 27, segments: 80 }, scene);
       earth.position.set(0, 0, 0);
       const earthMat = material(B, scene, 'planet-earth-mat', '#ffffff', 0.65, 0.08);
@@ -906,7 +1217,7 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
     }
 
     // Desktop-quality lighting with conservative mobile defaults.
-    if (quality !== 'low') {
+    if (sceneMode === 'planetary' && quality !== 'low') {
       try {
         shadowGenerator = new B.ShadowGenerator(quality === 'high' ? 1536 : 1024, sun);
         shadowGenerator.useBlurExponentialShadowMap = true;
@@ -921,10 +1232,10 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
         if (ground) ground.receiveShadows = true;
       } catch { shadowGenerator = null; }
     }
-    try {
+    if (sceneMode === 'planetary' && quality === 'high') try {
       postPipeline = new B.DefaultRenderingPipeline('orbital-frontier-post', true, scene, [camera]);
       postPipeline.fxaaEnabled = true;
-      postPipeline.bloomEnabled = quality === 'high';
+      postPipeline.bloomEnabled = true;
       postPipeline.bloomThreshold = 0.84;
       postPipeline.bloomWeight = 0.22;
       postPipeline.bloomKernel = 48;
@@ -934,6 +1245,27 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
       if (paused) return;
       const dt = Math.min(engine.getDeltaTime() / 1000, 0.05);
       if (!reducedMotion) animationTime += dt;
+      if (sceneMode === 'solar' && !reducedMotion) {
+        solarPivots.forEach((body) => { body.node.rotation.y += body.speed * dt; body.mesh.rotation.y += dt * 0.025; });
+      }
+      if (sceneMode === 'rocket' && rocketLaunchActive && rocketRoot) {
+        rocketLaunchElapsed += dt;
+        const progress = Math.min(1, rocketLaunchElapsed / 4.8);
+        const lift = progress * progress * 29;
+        rocketRoot.position.y = 1.1 + lift;
+        rocketRoot.rotation.z = Math.sin(progress * Math.PI) * 0.045;
+        camera.setTarget(new B.Vector3(rocketRoot.position.x, rocketRoot.position.y + 13, rocketRoot.position.z));
+        camera.radius = Math.max(28, 47 - progress * 13);
+        if (rocketLaunchElapsed > 4.8) {
+          rocketLaunchActive = false;
+          rocketExhaust?.stop();
+          const callback = rocketLaunchCallback;
+          rocketLaunchCallback = undefined;
+          sceneMode = 'planetary';
+          rebuildScene('earth');
+          callback?.();
+        }
+      }
       // Character and rover control: keyboard + virtual joystick share one movement model.
       if (playerControlled && playerAstronaut && !vehicleMode) {
         const forwardInput = (pressedKeys.has('w') || pressedKeys.has('arrowup') ? 1 : 0) - (pressedKeys.has('s') || pressedKeys.has('arrowdown') ? 1 : 0) - joystickY;
@@ -1002,6 +1334,21 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
         }
         camera.setTarget(new B.Vector3(roverRoot.position.x, roverRoot.position.y + 2.3, roverRoot.position.z));
       }
+      if (activatedStationId && animationTime - activatedStationAt < 1.35) {
+        const ring = scene.getMeshByName(`${activatedStationId}-station-ring`);
+        const status = scene.getMeshByName(`${activatedStationId}-terminal-status`);
+        const pulse = 1 + Math.sin((animationTime - activatedStationAt) * 11) * 0.13;
+        if (ring) ring.scaling.set(pulse, pulse, pulse);
+        if (status?.material?.emissiveColor) status.material.emissiveColor = new B.Color3(0.1 + pulse * 0.35, 0.55 + pulse * 0.22, 0.8);
+      } else if (activatedStationId) {
+        const ring = scene.getMeshByName(`${activatedStationId}-station-ring`);
+        const status = scene.getMeshByName(`${activatedStationId}-terminal-status`);
+        if (ring) ring.scaling.setAll(1);
+        if (status?.material?.emissiveColor) status.material.emissiveColor = B.Color3.FromHexString(activatedStationId === 'oxygen' ? '#54b8d8' : activatedStationId === 'power' ? '#efb64d' : '#52b9b0');
+        const stationRoot = scene.getTransformNodeByName(`station-${activatedStationId}`);
+        if (stationRoot) stationRoot.scaling.setAll(1);
+        activatedStationId = '';
+      }
       if (!reducedMotion) {
         if (destination === 'earth') {
           const cloudLayer = scene.getMeshByName('earth-cloud-shell');
@@ -1053,10 +1400,11 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
     });
   };
 
-  rebuildScene('mars');
-  engine.runRenderLoop(() => {
-    if (scene && !scene.isDisposed) scene.render();
-  });
+  engine.setHardwareScalingLevel(quality === 'low' ? 1.35 : quality === 'medium' ? 1.0 : 0.85);
+  rebuildScene(planet);
+  const renderFrame = (): void => { if (scene && !scene.isDisposed) scene.render(); };
+  let renderLoopActive = true;
+  engine.runRenderLoop(renderFrame);
   const resizeHandler = (): void => engine.resize();
   const keyDown = (event: KeyboardEvent): void => {
     const target = event.target;
@@ -1079,13 +1427,37 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
 
   return {
     get rendererName() { return rendererName; },
-    setPlanet(destination: Planet) { journeyActive = false; rebuildScene(destination); },
-    setPaused(value: boolean) { paused = value; if (dustSystem) { if (value || reducedMotion) dustSystem.stop(); else dustSystem.start(); } },
+    setPlanet(destination: Planet) { journeyActive = false; sceneMode = 'planetary'; rebuildScene(destination); },
+    setSceneMode(mode: SceneMode) { journeyActive = false; sceneMode = mode; rebuildScene(planet); if (mode === 'solar' || mode === 'rocket') { playerControlled = false; vehicleMode = false; } },
+    focusCelestial(name: string) {
+      const body = solarBodies.get(name.toLowerCase());
+      if (!body || !camera) return;
+      const target = body.getAbsolutePosition();
+      camera.setTarget(target);
+      camera.radius = Math.max(12, body.getBoundingInfo().boundingSphere.radiusWorld * 7.2);
+    },
+    setRocketConfiguration(config: RocketConfiguration) { rocketConfig = { ...config }; if (sceneMode === 'rocket') rebuildScene(planet); },
+    launchRocket(destination: Planet, onComplete?: () => void) {
+      if (sceneMode !== 'rocket' || !rocketConfig.crewCapsule || !rocketConfig.mainEngine || !rocketConfig.fuelTank || !rocketConfig.communications || !rocketRoot) return;
+      journeyDestination = destination; rocketLaunchElapsed = 0; rocketLaunchActive = true; rocketLaunchCallback = onComplete; paused = false;
+      try { rocketExhaust?.start(); } catch { /* rocket motion remains playable without particles */ }
+    },
+    setPaused(value: boolean) {
+      paused = value;
+      // Stop the GPU render loop while the app is in a secondary screen or
+      // background tab. Resume it on the next active game/planet screen.
+      if (value && renderLoopActive) { engine.stopRenderLoop(renderFrame); renderLoopActive = false; }
+      else if (!value && !renderLoopActive) { engine.runRenderLoop(renderFrame); renderLoopActive = true; }
+      if (dustSystem) { if (value || reducedMotion) dustSystem.stop(); else dustSystem.start(); }
+    },
     setGraphicsQuality(value: GraphicsQuality) {
+      const changed = quality !== value;
       quality = value;
       const ratio = value === 'low' ? 0.72 : value === 'medium' ? 1 : 1.25;
       engine.setHardwareScalingLevel(1 / ratio);
-      if (value === 'low' && planet !== 'earth') rebuildScene(planet);
+      // Avoid rebuilding the entire solar system a second time during initial
+      // renderer hand-off when the requested quality has not changed.
+      if (changed && (sceneMode === 'solar' || sceneMode === 'rocket' || value === 'low' && planet !== 'earth')) rebuildScene(planet);
     },
     setReducedMotion(value: boolean) { reducedMotion = value; if (dustSystem) { if (value || paused) dustSystem.stop(); else dustSystem.start(); } },
     setCameraMode(mode: CameraMode) {
@@ -1165,7 +1537,15 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
         camera.radius = 12;
       }
     },
+    activateStation(id: string) {
+      activatedStationId = id; activatedStationAt = animationTime;
+      const rootNode = scene.getTransformNodeByName(`station-${id}`);
+      if (rootNode) { rootNode.scaling.setAll(1.035); }
+      const station = stationRecords.find((item) => item.id === id);
+      if (station && camera) camera.setTarget(new B.Vector3(station.position.x, station.position.y + 2, station.position.z));
+    },
     playJourney(destination: Planet, onComplete?: () => void) {
+      sceneMode = 'planetary';
       if (destination === 'earth') { rebuildScene('earth'); onComplete?.(); return; }
       if (!spacecraftRoot) spacecraftRoot = createSpacecraft(B, scene, 42, -32);
       journeyDestination = destination;
@@ -1180,6 +1560,7 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
       window.removeEventListener('keydown', keyDown);
       window.removeEventListener('keyup', keyUp);
       engine.stopRenderLoop();
+      try { rocketExhaust?.stop(); } catch { /* already disposed */ }
       scene?.dispose();
       engine.dispose();
     },
