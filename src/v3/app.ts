@@ -23,6 +23,7 @@ import { createBabylonWorld, type BabylonWorld, type CameraMode, type GraphicsQu
 import { createCanvasFallback } from '../engine/canvasFallback';
 import { createLanderState, startLander, stepLander, type LanderControls, type LanderState } from '../game/lander';
 import { DEFAULT_ROCKET, ROCKET_PARTS, buildStandardRocket, calculateRocketMetrics, type RocketConfiguration } from '../game/rocket';
+import { mapJoystickDisplacement } from '../game/controls';
 
 type Theme = 'light' | 'dark' | 'glass';
 type View = 'onboarding' | 'home' | 'universe' | 'rocket' | 'game' | 'missions' | 'worlds' | 'outpost' | 'crew' | 'explore' | 'science' | 'journal' | 'settings' | 'lander' | 'account';
@@ -51,7 +52,7 @@ const esc = (value: string): string => value.replace(/[&<>"']/g, (c) => ({ '&': 
 const clamp = (value: number): number => Math.max(0, Math.min(100, value));
 const planets: Planet[] = ['earth', 'moon', 'mars'];
 const ONBOARDING_KEY = 'ksa-outpost-86-onboarding-v35';
-const RELEASE_LABEL = 'V3.6 · FINAL COMPETITION RELEASE';
+const RELEASE_LABEL = 'V3.7 · RESPONSIVE 3D FRONTIER';
 const crew: Array<{ id: string; name: string; role: CrewRole; skill: number; specialty: string; avatar: string }> = [
   { id: 'alamin', name: 'Al-Amin', role: 'Commander', skill: 94, specialty: 'Mission operations', avatar: 'AL' },
   { id: 'imran', name: 'Imran', role: 'Pilot', skill: 91, specialty: 'Flight operations', avatar: 'IM' },
@@ -222,13 +223,28 @@ function header(): string {
   const name = account?.name ?? 'Guest commander';
   return `<header class="app-header">${brand()}<div class="header-center" title="${RELEASE_LABEL}"><span class="live-dot"></span><span>${serverStatus === 'ready' ? 'ACCOUNT SYSTEMS ONLINE' : serverStatus === 'checking' ? 'CHECKING SYSTEMS' : 'GUEST SYSTEMS'}</span><i></i><strong>${view === 'rocket' ? 'ROCKET WORKSHOP' : view === 'universe' ? 'SOLAR SYSTEM' : `${selectedPlanet.toUpperCase()} ${view === 'game' ? `· DAY ${currentDay()}/7` : '· READY'}`}</strong></div><div class="header-actions"><button class="header-more" data-action="toggle-more" aria-label="More features" aria-expanded="${showMoreMenu}"><span>•••</span><small>MORE</small></button><button class="header-alert" data-action="notifications" aria-label="Notifications (${notificationHistory.length})" aria-expanded="${notificationsOpen}" title="Mission notifications">♢<span>${notificationHistory.filter((n) => n.tone !== 'info').length || ''}</span></button><button class="profile-button" data-action="account"><span class="profile-avatar">${esc(account?.avatar ?? 'G')}</span><span class="profile-name">${esc(name)}</span><b>⌄</b></button></div></header>`;
 }
+function navigationButton(item: { view: View; label: string; icon: string }, compact = false): string {
+  const active = view === item.view || (['science', 'journal', 'settings'].includes(view) && item.view === 'explore');
+  return `<button class="${compact ? 'sidebar-item' : 'nav-item'} ${active ? 'active' : ''}" data-action="navigate" data-view="${item.view}" aria-label="${item.label}" aria-current="${view === item.view ? 'page' : 'false'}" title="${item.label}"><span class="${compact ? 'sidebar-glyph' : 'nav-glyph'}" aria-hidden="true">${item.icon}</span><span class="${compact ? 'sidebar-item-label' : ''}">${item.label}</span></button>`;
+}
 function bottomNavigation(): string {
   if (view === 'onboarding' || view === 'account' || view === 'lander') return '';
-  return `<nav class="bottom-nav" aria-label="Main navigation">${NAV.map((item) => `<button class="nav-item ${view === item.view || (view === 'science' || view === 'journal' || view === 'settings') && item.view === 'explore' ? 'active' : ''}" data-action="navigate" data-view="${item.view}" aria-current="${view === item.view ? 'page' : 'false'}"><span class="nav-glyph">${item.icon}</span><span>${item.label}</span></button>`).join('')}</nav>`;
+  return `<nav class="bottom-nav" aria-label="Main navigation">${NAV.map((item) => navigationButton(item)).join('')}</nav>`;
+}
+function desktopSidebar(): string {
+  if (view === 'onboarding' || view === 'account' || view === 'lander') return '';
+  const secondary: Array<{ view: View; label: string; icon: string }> = [
+    { view: 'science', label: 'Science lab', icon: '⚗' },
+    { view: 'journal', label: 'Mission journal', icon: '≡' },
+    { view: 'lander', label: 'Lunar Lander Lab', icon: '⌁' },
+    { view: 'settings', label: 'Settings', icon: '⚙' },
+  ];
+  return `<aside class="desktop-sidebar" aria-label="Mission navigation"><div class="sidebar-kicker">MISSION SYSTEMS</div><div class="sidebar-section-label">COMMAND</div><nav class="sidebar-nav" aria-label="Primary destinations">${NAV.map((item) => navigationButton(item, true)).join('')}</nav><div class="sidebar-divider"></div><div class="sidebar-section-label">OPERATIONS</div><nav class="sidebar-nav sidebar-secondary" aria-label="Additional destinations">${secondary.map((item) => navigationButton(item, true)).join('')}</nav><div class="sidebar-foot"><span class="sidebar-live-dot"></span><div><strong>OUTPOST SYSTEMS</strong><small>LOCAL MISSION READY</small></div></div></aside>`;
 }
 function commonMain(content: string): string {
   const notificationPanel = notificationsOpen ? `<div class="notification-backdrop" data-action="close-notifications"><section class="notification-panel" role="dialog" aria-modal="true" aria-label="Mission notifications" data-notification-panel><div class="notification-panel-head"><div><span class="eyebrow-pill">MISSION CONTROL</span><h2>Command updates</h2></div><button class="modal-close" data-action="close-notifications" aria-label="Close notifications" title="Close notifications">×</button></div>${notificationHistory.length ? notificationHistory.slice(0, 20).map((n) => `<article class="notification-entry ${esc(n.tone)}"><i></i><div><strong>${esc(n.title)}</strong><p>${esc(n.body)}</p><small>${new Date(n.time).toLocaleString()}</small></div></article>`).join('') : `<div class="notification-empty"><strong>All quiet, Commander.</strong><p>Mission Control updates and system warnings will appear here.</p></div>`}<button class="secondary-button" data-action="navigate" data-view="journal">Open mission journal →</button></section></div>` : '';
-  return `${header()}<main class="app-main ${view === 'game' ? 'game-main' : ''}" id="app-main">${content}</main>${bottomNavigation()}<div id="more-popover" class="more-popover ${showMoreMenu ? 'open' : ''}"><button data-action="open-universe">3D Solar system</button><button data-action="open-rocket">Rocket workshop</button><button data-action="navigate" data-view="science">Science lab</button><button data-action="navigate" data-view="journal">Mission journal</button><button data-action="navigate" data-view="lander">Lunar Lander Lab</button><button data-action="navigate" data-view="settings">Settings</button></div>${notificationPanel}<div id="toast-host" aria-live="polite"></div>`;
+  const hasNavigation = !['account', 'lander'].includes(view);
+  return `${header()}${desktopSidebar()}<main class="app-main ${view === 'game' ? 'game-main' : ''} ${hasNavigation ? 'has-desktop-sidebar' : 'main-without-navigation'}" id="app-main">${content}</main>${bottomNavigation()}<div id="more-popover" class="more-popover ${showMoreMenu ? 'open' : ''}"><button data-action="open-universe">3D Solar system</button><button data-action="open-rocket">Rocket workshop</button><button data-action="navigate" data-view="science">Science lab</button><button data-action="navigate" data-view="journal">Mission journal</button><button data-action="navigate" data-view="lander">Lunar Lander Lab</button><button data-action="navigate" data-view="settings">Settings</button></div>${notificationPanel}<div id="toast-host" aria-live="polite"></div>`;
 }
 
 function renderOnboarding(): string {
@@ -246,8 +262,8 @@ function renderOnboarding(): string {
         { id:'oxygen', icon:'O₂', name:'Oxygen', detail:'Keep breathable air systems healthy.' },
         { id:'power', icon:'ϟ', name:'Power', detail:'Balance sunlight, batteries and demand.' },
         { id:'water', icon:'H₂O', name:'Water', detail:'Recover water and protect reserves.' },
-      ].map((station) => `<button class="training-station ${onboardingChecks.has(station.id) ? 'checked' : ''}" data-action="onboard-focus" data-value="${station.id}"><span>${station.icon}</span><div><strong>${station.name}</strong><small>${station.detail}</small></div><b>${onboardingChecks.has(station.id) ? '✓ DONE' : 'WAYPOINT ↗'}</b></button>`).join('')}</div><div class="onboard-actions"><button class="quiet-button" data-action="onboard-back">Back</button><button class="primary-button" data-action="finish-onboarding" ${completed < 3 ? 'disabled' : ''}>Start my adventure <b>→</b></button></div><small class="onboard-completion">${completed}/3 training systems checked ${completed === 3 ? '· COMMANDER BADGE UNLOCKED' : ''}</small></div>`;
-  return `<section class="onboarding-screen"><div class="onboarding-scene-note"><span class="scene-pulse"></span> LIVE 3D ENVIRONMENT <span>DRAG TO LOOK AROUND</span></div><div class="onboarding-layout"><div class="onboarding-main">${stepContent}</div><aside class="onboarding-progress"><div class="progress-header"><strong>YOUR FIRST FLIGHT</strong><span>STEP 0${onboardingStep} / 03</span></div><div class="onboarding-track"><i style="width:${(onboardingStep/3)*100}%"></i></div>${steps.map((step) => `<div class="onboarding-step ${onboardingStep === step.n ? 'current' : onboardingStep > step.n ? 'done' : ''}"><b>${onboardingStep > step.n ? '✓' : `0${step.n}`}</b><div><strong>${step.title}</strong><small>${step.sub}</small></div></div>`).join('')}<div class="onboarding-footer"><span>DESIGNED FOR FIRST-TIME EXPLORERS</span><button data-action="skip-onboarding">Skip tutorial ↗</button></div></aside></div>${onboardingStep === 3 ? `<div class="onboard-guided-controls"><div id="onboarding-interaction-hint" class="interaction-hint"><span class="keycap">W A S D</span><div><strong>Walk to the glowing stations</strong><small>Choose a waypoint, walk close, then press E or tap INTERACT.</small></div></div><div class="onboard-control-hints"><kbd>W A S D</kbd><span>MOVE</span><kbd>SHIFT</kbd><span>RUN</span><kbd>E</kbd><span>INTERACT</span></div><div class="onboard-touch-controls"><div class="touch-joystick" id="move-joystick" aria-label="Move astronaut"><span class="joystick-ring"></span><span class="joystick-knob" id="move-knob"></span></div><button data-action="mobile-interact">INTERACT</button></div></div>` : ''}<div class="onboarding-brand">KSA OUTPOST 86 <span>·</span> ORBITAL FRONTIER</div></section>`;
+      ].map((station) => `<button class="training-station ${onboardingChecks.has(station.id) ? 'checked' : ''}" data-action="onboard-focus" data-value="${station.id}"><span>${station.icon}</span><div><strong>${station.name}</strong><small>${station.detail}</small></div><b>${onboardingChecks.has(station.id) ? '✓ DONE' : 'WAYPOINT ↗'}</b></button>`).join('')}</div><div class="onboard-actions"><button class="quiet-button" data-action="onboard-back">Back</button><button class="primary-button" data-action="finish-onboarding" ${completed < 3 ? 'disabled' : ''}>Start Exploring <b>→</b></button></div><small class="onboard-completion">${completed}/3 training systems checked ${completed === 3 ? '· COMMANDER BADGE UNLOCKED' : ''}</small></div>`;
+  return `<section class="onboarding-screen"><div class="onboarding-scene-note"><span class="scene-pulse"></span> LIVE 3D ENVIRONMENT <span>DRAG TO LOOK AROUND</span><button class="onboarding-skip" data-action="skip-onboarding">Skip</button></div><div class="onboarding-layout"><div class="onboarding-main">${stepContent}</div><aside class="onboarding-progress"><div class="progress-header"><strong>YOUR FIRST FLIGHT</strong><span>STEP 0${onboardingStep} / 03</span></div><div class="onboarding-track"><i style="width:${(onboardingStep/3)*100}%"></i></div>${steps.map((step) => `<div class="onboarding-step ${onboardingStep === step.n ? 'current' : onboardingStep > step.n ? 'done' : ''}"><b>${onboardingStep > step.n ? '✓' : `0${step.n}`}</b><div><strong>${step.title}</strong><small>${step.sub}</small></div></div>`).join('')}<div class="onboarding-footer"><span>DESIGNED FOR FIRST-TIME EXPLORERS</span></div></aside></div>${onboardingStep === 3 ? `<div class="onboard-guided-controls"><div id="onboarding-interaction-hint" class="interaction-hint"><span class="keycap">W A S D</span><div><strong>Walk to the glowing stations</strong><small>Choose a waypoint, walk close, then press E or tap INTERACT.</small></div></div><div class="onboard-control-hints"><kbd>W A S D</kbd><span>MOVE</span><kbd>SHIFT</kbd><span>RUN</span><kbd>E</kbd><span>INTERACT</span></div><div class="onboard-touch-controls"><div class="touch-joystick" id="move-joystick" aria-label="Move astronaut"><span class="joystick-ring"></span><span class="joystick-knob" id="move-knob"></span></div><button data-action="mobile-interact">INTERACT</button></div></div>` : ''}<div class="onboarding-brand">KSA OUTPOST 86 <span>·</span> ORBITAL FRONTIER</div></section>`;
 }
 
 function renderHome(): string {
@@ -886,31 +902,54 @@ root.addEventListener('change', (event) => {
   if (input instanceof HTMLInputElement && input.dataset.setting === 'audio') { audioEnabled = input.checked; audio.setEnabled(audioEnabled); }
 });
 
-// Mobile virtual joystick. Pointer capture keeps movement smooth if the thumb leaves the control ring.
+// Mobile virtual joystick: map the active thumb's real displacement to a
+// normalised camera-relative input vector. Only its own pointer may release it.
 let joystickPointer: number | null = null;
+let joystickTarget: HTMLElement | null = null;
 let joystickCenter = { x: 0, y: 0 };
+let joystickMaxTravel = 28;
 function updateJoystick(event: PointerEvent): void {
-  if (joystickPointer !== event.pointerId) return;
+  if (joystickPointer !== event.pointerId || !joystickTarget) return;
   const dx = event.clientX - joystickCenter.x;
   const dy = event.clientY - joystickCenter.y;
-  const max = 38; const length = Math.max(1, Math.hypot(dx, dy));
-  const x = dx / Math.max(max, length); const y = dy / Math.max(max, length);
+  const { x, y } = mapJoystickDisplacement(dx, dy, joystickMaxTravel);
   world?.setJoystick(x, y);
   world?.setVehicleInput(x, -y);
-  const knob = document.querySelector<HTMLElement>('#move-knob');
-  if (knob) knob.style.transform = `translate(${x*28}px, ${y*28}px)`;
+  const knob = joystickTarget.querySelector<HTMLElement>('#move-knob');
+  if (knob) knob.style.transform = `translate(${x * joystickMaxTravel}px, ${y * joystickMaxTravel}px)`;
+  event.preventDefault();
+}
+function resetJoystick(pointerId?: number): void {
+  if (joystickPointer === null || pointerId !== undefined && pointerId !== joystickPointer) return;
+  const target = joystickTarget;
+  const activePointer = joystickPointer;
+  joystickPointer = null;
+  joystickTarget = null;
+  world?.setJoystick(0, 0);
+  world?.setVehicleInput(0, 0);
+  target?.querySelector<HTMLElement>('#move-knob')?.style.setProperty('transform', 'translate(0,0)');
+  if (target?.hasPointerCapture(activePointer)) {
+    try { target.releasePointerCapture(activePointer); } catch { /* capture may already have been released by the browser */ }
+  }
 }
 root.addEventListener('pointerdown', (event) => {
   const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('#move-joystick') : null;
-  if (!target) return;
-  joystickPointer = event.pointerId; const rect = target.getBoundingClientRect();
-  joystickCenter = { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
-  target.setPointerCapture(event.pointerId); updateJoystick(event);
+  if (!target || joystickPointer !== null || event.button !== 0) return;
+  const rect = target.getBoundingClientRect();
+  joystickPointer = event.pointerId;
+  joystickTarget = target;
+  joystickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  joystickMaxTravel = Math.max(12, Math.min(rect.width, rect.height) * 0.28);
+  try { target.setPointerCapture(event.pointerId); } catch { /* root pointer listeners remain a fallback */ }
+  updateJoystick(event);
 });
-root.addEventListener('pointermove', updateJoystick);
-function resetJoystick(): void { joystickPointer = null; world?.setJoystick(0,0); world?.setVehicleInput(0,0); const knob = document.querySelector<HTMLElement>('#move-knob'); if (knob) knob.style.transform = 'translate(0,0)'; }
-root.addEventListener('pointerup', resetJoystick);
-root.addEventListener('pointercancel', resetJoystick);
+// Window-level listeners also cover the rare case where pointer capture is unavailable.
+window.addEventListener('pointermove', updateJoystick);
+window.addEventListener('pointerup', (event) => resetJoystick(event.pointerId));
+window.addEventListener('pointercancel', (event) => resetJoystick(event.pointerId));
+window.addEventListener('lostpointercapture', (event) => resetJoystick((event as PointerEvent).pointerId));
+window.addEventListener('blur', () => resetJoystick());
+document.addEventListener('visibilitychange', () => { if (document.hidden) resetJoystick(); });
 
 window.addEventListener('keydown', (event) => {
   const target = event.target;

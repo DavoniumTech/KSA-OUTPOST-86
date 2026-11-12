@@ -1,3 +1,6 @@
-KSA OUTPOST 86 v3.6.0 — FINAL COMPETITION POLISH
+KSA OUTPOST 86 v3.7.0 — RESPONSIVE 3D FRONTIER UPGRADE
 Repository: https://github.com/DavoniumTech/KSA-OUTPOST-86.git
-Branch: main
+Target branch: main
+Baseline: V3.6.0 final competition release
+
+This archive contains local source changes. No GitHub push or Cloudflare deployment is implied.

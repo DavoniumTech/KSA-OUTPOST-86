@@ -1,7 +1,7 @@
 {
   "name": "ksa-outpost-86",
   "private": true,
-  "version": "3.6.0",
+  "version": "3.7.0",
   "description": "KSA OUTPOST 86 \u2014 Orbital Frontier final competition release.",
   "type": "module",
   "scripts": {

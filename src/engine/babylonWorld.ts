@@ -82,7 +82,7 @@ function terrainHeight(x: number, z: number, planet: Planet): number {
   const fine = smoothNoise(x, z, 2.1, 19) * (planet === 'mars' ? 0.46 : 0.24);
   const ridge = Math.pow(Math.abs(smoothNoise(x, z, 13, 31) - 0.5) * 2, 1.5) * (planet === 'mars' ? 2.1 : 1.0);
   const craterCenters = planet === 'moon'
-    ? [[-20, -9, 8, 2.5], [18, 14, 11, 3.1], [8, -25, 6, 1.6], [-31, 26, 5, 1.3]]
+    ? [[-20, -9, 8, 2.5], [18, 14, 11, 3.1], [8, -25, 6, 1.6], [-31, 26, 5, 1.3], [34, -27, 4.4, 0.82], [-43, -4, 3.2, 0.58], [2, 42, 4.8, 0.68]]
     : [[-26, 17, 7, 1.4], [23, -20, 10, 1.6], [8, 29, 5, 1.0]];
   let crater = 0;
   for (const [cx, cz, radius, depth] of craterCenters) {
@@ -276,10 +276,25 @@ function createTerrain(B: any, scene: any, planet: Planet, baseUrl: string, qual
   ground.useVertexAlpha = false;
   ground.bumpTexture = null;
   if (planet === 'moon') {
-    const albedo = new B.Texture(`${baseUrl}assets/terrain/south-pole-regolith-albedo.jpg`, scene, true, false, B.Texture.TRILINEAR_SAMPLINGMODE, undefined, () => undefined);
+    // Local, compressed lunar maps add granular regolith detail without
+    // delaying the app shell or first solar-system screen.
+    const albedo = new B.Texture(`${baseUrl}assets/terrain/south-pole-regolith-albedo.webp`, scene, true, false, B.Texture.TRILINEAR_SAMPLINGMODE, undefined, () => undefined);
     albedo.uScale = 7;
     albedo.vScale = 7;
     ground.albedoTexture = albedo;
+    const normal = new B.Texture(`${baseUrl}assets/terrain/south-pole-normal-1k.webp`, scene, true, false, B.Texture.TRILINEAR_SAMPLINGMODE, undefined, () => undefined);
+    normal.uScale = 9;
+    normal.vScale = 9;
+    normal.gammaSpace = false;
+    ground.bumpTexture = normal;
+    const roughness = new B.Texture(`${baseUrl}assets/terrain/south-pole-roughness-1k.webp`, scene, true, false, B.Texture.TRILINEAR_SAMPLINGMODE, undefined, () => undefined);
+    roughness.uScale = 7;
+    roughness.vScale = 7;
+    roughness.gammaSpace = false;
+    ground.metallicTexture = roughness;
+    ground.metallic = 0;
+    ground.useRoughnessFromMetallicTextureGreen = true;
+    ground.useMetallnessFromMetallicTextureBlue = false;
   } else if (planet === 'mars') {
     // Original, tileable Mars material maps are loaded only when Mars is
     // selected. The first solar-system view and Moon therefore do not pay
@@ -910,6 +925,25 @@ function createStationTerminal(B: any, scene: any, id: string, title: string, x:
   status.position.set(0, 1.82, -0.47); status.material = glow; status.parent = root;
   const ring = B.MeshBuilder.CreateTorus(`${id}-station-ring`, { diameter: 2.45, thickness: 0.075, tessellation: 40 }, scene);
   ring.rotation.x = Math.PI / 2; ring.position.y = 0.15; ring.material = glow; ring.parent = root;
+  if (id === 'oxygen') {
+    const vessel = material(B, scene, 'oxygen-vessel-alloy', '#c7d0d1', 0.28, 0.72);
+    const collar = material(B, scene, 'oxygen-vessel-collar', '#465864', 0.34, 0.66);
+    const pipe = material(B, scene, 'oxygen-pipe-alloy', '#9cabb0', 0.32, 0.62);
+    for (const side of [-1, 1]) {
+      const tank = B.MeshBuilder.CreateCylinder(`oxygen-storage-vessel-${side}`, { height: 1.8, diameter: 0.72, tessellation: 20 }, scene);
+      tank.position.set(side * 1.18, 0.95, 0.23); tank.material = vessel; tank.parent = root;
+      const foot = B.MeshBuilder.CreateCylinder(`oxygen-vessel-foot-${side}`, { height: 0.18, diameter: 0.82, tessellation: 20 }, scene);
+      foot.position.set(side * 1.18, 0.12, 0.23); foot.material = collar; foot.parent = root;
+      const neck = B.MeshBuilder.CreateCylinder(`oxygen-vessel-neck-${side}`, { height: 0.24, diameter: 0.3, tessellation: 16 }, scene);
+      neck.position.set(side * 1.18, 1.94, 0.23); neck.material = collar; neck.parent = root;
+      const band = B.MeshBuilder.CreateTorus(`oxygen-vessel-band-${side}`, { diameter: 0.76, thickness: 0.055, tessellation: 20 }, scene);
+      band.rotation.x = Math.PI / 2; band.position.set(side * 1.18, 1.45, 0.23); band.material = glow; band.parent = root;
+    }
+    const manifold = B.MeshBuilder.CreateCylinder('oxygen-transfer-manifold', { height: 2.3, diameter: 0.14, tessellation: 16 }, scene);
+    manifold.rotation.z = Math.PI / 2; manifold.position.set(0, 1.52, 0.55); manifold.material = pipe; manifold.parent = root;
+    const valve = B.MeshBuilder.CreateTorus('oxygen-manifold-valve', { diameter: 0.32, thickness: 0.055, tessellation: 18 }, scene);
+    valve.rotation.x = Math.PI / 2; valve.position.set(0, 1.52, 0.55); valve.material = glow; valve.parent = root;
+  }
 }
 
 function createHabitatInterior(B: any, scene: any, planet: Planet): void {

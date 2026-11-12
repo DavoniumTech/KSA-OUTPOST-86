@@ -1,4 +1,4 @@
-# KSA OUTPOST 86 — Version 3.6.0
+# KSA OUTPOST 86 — Version 3.7.0
 
 ## ORBITAL FRONTIER · A playable planetary adventure
 
@@ -8,7 +8,7 @@ KSA OUTPOST 86 is an independent educational space-exploration game. Version 3.6
 
 ## Play the game
 
-1. Open the application. The V3.6 onboarding appears once, even if an older tutorial was already completed. The first solar-system scene is lazy-loaded after the app shell.
+1. Open the application. The V3.7 onboarding appears once, even if an older tutorial was already completed. The first solar-system scene is lazy-loaded after the app shell.
 2. Complete the three onboarding steps: **Meet Your Crew**, **Choose Your Planet**, and **Learn to Command**. The final step teaches oxygen, power and water station interactions. Onboarding can be replayed from Settings.
 3. After onboarding, choose **Play now · 5-minute demo** on Home; it preselects Mars and assembles the standard rocket. Review the flight check and press **Launch Expedition**. Choose **Customise my rocket** if you want to change components first. You can also customise every rocket component.
 4. In the game, use the controls below. Follow the Primary Objective shown on the left, travel to the highlighted station and complete its activity.
@@ -67,7 +67,7 @@ Guest play is available and stores progress in the current browser. Create an ac
 
 The account API uses a secure HttpOnly session cookie, PBKDF2 password hashing, per-email failed-login throttling, and user-keyed Durable Objects for saves and events. The current build does **not** include email verification, email-based password reset, or Web Push delivery after the browser is completely closed. Browser notifications can be enabled for important events while the tab is in the background; live events can reach another active signed-in session over WebSocket.
 
-## V3.6 release and mobile notes
+## V3.7 release and mobile notes
 
 - The three-step tutorial remains skippable and can be replayed from Settings. Existing completion is preserved.
 - Babylon.js is dynamically imported after the UI shell renders. Mars albedo, normal and roughness textures are loaded only when the Mars world is selected.
@@ -75,12 +75,22 @@ The account API uses a secure HttpOnly session cookie, PBKDF2 password hashing, 
 - The render loop pauses when the app is on non-game screens or the browser tab is hidden, saving battery and GPU time.
 - Home leads with **Play now · 5-minute demo**, which assembles the standard Mars rocket and opens the launch flow. Custom rocket assembly and solar-system exploration remain available as secondary actions.
 
-## V3.6 visual polish
+## V3.7 visual and interaction updates
 
 - Notification drawer close and mission-journal actions work; non-action clicks inside the panel no longer trigger the backdrop.
 - The KSA brand mark is an original orbital emblem.
 - Solar-system preview includes animated Earth and Mars relay satellites plus a slowly drifting asteroid belt.
 - The new Mars regolith albedo, normal and roughness maps are original procedural textures, not NASA-provided measurements.
+
+
+### V3.7 responsive 3D frontier update
+
+- Desktop navigation now uses a persistent left mission sidebar; tablet widths use a compact icon rail; phones retain a fixed bottom navigation dock with safe-area spacing.
+- The mobile joystick now derives its movement radius from the rendered control size, follows the active thumb displacement, and only resets for its own pointer. Pointer cancellation, lost capture, tab hiding and window blur all release movement safely.
+- The Moon's existing procedural terrain now includes additional small impact features. Its regolith uses local compressed albedo, normal and roughness maps, loaded only when the Moon scene is selected.
+- The oxygen console now has a recognizable 3D pair of pressure vessels, manifold, valve and status bands.
+- The three-screen onboarding keeps Skip visible on phones, avoids an internal scroll area, and labels the final action **Start Exploring**.
+- Lunar textures are converted to WebP for smaller on-demand transfers. The initial app-shell cache is versioned as v11.
 
 ## Technology
 

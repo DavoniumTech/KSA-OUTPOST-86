@@ -156,6 +156,39 @@ if (-not (Test-Path -LiteralPath (Join-Path $resolvedPackage 'package.json'))) {
 if (-not (Test-Path -LiteralPath (Join-Path $resolvedPackage 'src/main.ts'))) {
     throw "Package root does not contain src/main.ts: $resolvedPackage"
 }
+$packageMetadata = Get-Content -LiteralPath (Join-Path $resolvedPackage 'package.json') -Raw | ConvertFrom-Json
+if ($packageMetadata.version -ne '3.7.0') {
+    throw "Expected KSA OUTPOST 86 package version 3.7.0; found '$($packageMetadata.version)'."
+}
+if (-not (Test-Path -LiteralPath (Join-Path $resolvedPackage 'package-lock.json'))) {
+    throw 'The package must include package-lock.json so the exact dependency tree can be installed.'
+}
+
+# Validate the exact packaged project before touching the user's checkout.
+# A failed install, typecheck, test, or production build must never be pushed.
+$nodeVersionResult = Invoke-Native -Executable 'node' -Arguments @('--version')
+$nodeVersionText = (($nodeVersionResult.Output | Select-Object -First 1).Trim() -replace '^v', '')
+try {
+    $nodeVersion = [version]$nodeVersionText
+}
+catch {
+    throw "Could not parse Node.js version '$nodeVersionText'. Install Node.js 22.16 or newer."
+}
+if ($nodeVersion -lt [version]'22.16.0') {
+    throw "Node.js 22.16 or newer is required. Found $nodeVersionText."
+}
+
+Write-Host 'Installing the exact locked dependencies in the temporary package...' -ForegroundColor Cyan
+Push-Location $resolvedPackage
+try {
+    Invoke-Native -Executable 'npm' -Arguments @('ci') | Out-Null
+    Write-Host 'Running TypeScript checks, all tests, and the production build...' -ForegroundColor Cyan
+    Invoke-Native -Executable 'npm' -Arguments @('run', 'build') | Out-Null
+}
+finally {
+    Pop-Location
+}
+Write-Host 'Package validation passed. The existing repository has not been changed yet.' -ForegroundColor Green
 
 $gitRootResult = Invoke-Native -Executable 'git' -Arguments @('-C', $resolvedRepo, 'rev-parse', '--show-toplevel')
 $resolvedRepo = (Resolve-Path -LiteralPath (($gitRootResult.Output | Select-Object -First 1).Trim())).Path
@@ -227,11 +260,8 @@ try {
         Merge-WranglerConfig -IncomingPath $wranglerSource -ExistingPath $wranglerTarget
     }
 
-    # The PlayCanvas world entry was replaced by the Babylon.js renderer.
-    $obsoleteRenderer = Join-Path $resolvedRepo 'src/engine/createWorld.ts'
-    if (Test-Path -LiteralPath $obsoleteRenderer -PathType Leaf) {
-        Remove-Item -LiteralPath $obsoleteRenderer -Force
-    }
+    # Preserve repository-only source files; this release updates the existing
+    # Babylon.js world and does not delete files outside the release archive.
 
     Invoke-Git -Arguments @('add', '-A', '--', '.') | Out-Null
     $diff = Invoke-Native -Executable 'git' -Arguments @('diff', '--cached', '--quiet') -AllowedExitCodes @(0,1)
@@ -247,7 +277,7 @@ try {
         throw "Potential secret files are staged. Deployment stopped: $($secretFiles -join ', ')"
     }
 
-    Invoke-Git -Arguments @('commit', '-m', 'feat: KSA Outpost 86 v3.6 final competition polish') | Out-Null
+    Invoke-Git -Arguments @('commit', '-m', 'feat: KSA Outpost 86 v3.7 responsive 3D frontier upgrade') | Out-Null
     Invoke-Git -Arguments @('push', 'origin', 'main') | Out-Null
 
     $localHead = (Invoke-Git -Arguments @('rev-parse', 'HEAD') | Select-Object -First 1).Trim()

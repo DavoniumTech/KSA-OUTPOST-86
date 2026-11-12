@@ -873,3 +873,101 @@ button { touch-action: manipulation; }
   .game-right-hud button { min-height: 40px; padding: 8px 9px; font-size: 10px; }
   .mobile-game-controls .touch-actions button { min-height: 46px; padding-inline: 10px; font-size: 11px; }
 }
+
+
+/* V3.7 — responsive command navigation: desktop sidebar, tablet rail, phone dock. */
+.desktop-sidebar { display: none; }
+@media (min-width: 1024px) {
+  :root { --sidebar-width: 246px; }
+  .desktop-sidebar { position: fixed; z-index: 46; top: calc(var(--header-height) + env(safe-area-inset-top)); bottom: 0; left: 0; width: var(--sidebar-width); display: flex; flex-direction: column; gap: 12px; padding: 23px 15px 18px; border-right: 1px solid var(--line); background: color-mix(in srgb, var(--surface-solid) 94%, transparent); color: var(--ink); box-shadow: 10px 0 34px rgba(25,31,35,.055); backdrop-filter: blur(22px) saturate(1.18); -webkit-backdrop-filter: blur(22px) saturate(1.18); pointer-events: auto; }
+  .sidebar-kicker { padding: 2px 12px 14px; color: var(--accent-strong); font: 800 10px var(--mono); letter-spacing: .18em; }
+  .sidebar-section-label { padding: 8px 12px 5px; color: var(--muted); font: 800 9px var(--mono); letter-spacing: .16em; }
+  .sidebar-nav { display: grid; gap: 5px; }
+  .sidebar-item { width: 100%; min-height: 47px; display: grid; grid-template-columns: 38px minmax(0,1fr); align-items: center; gap: 9px; padding: 5px 11px; border: 1px solid transparent; border-radius: 13px; background: transparent; color: var(--muted); text-align: left; font-size: 13px; font-weight: 800; transition: background .18s ease, color .18s ease, border-color .18s ease, transform .18s ease; }
+  .sidebar-item:hover { transform: translateX(2px); background: var(--accent-soft); color: var(--accent-strong); }
+  .sidebar-item.active { border-color: color-mix(in srgb,var(--accent) 23%,transparent); background: var(--accent-soft); color: var(--accent-strong); box-shadow: inset 3px 0 var(--accent); }
+  .sidebar-glyph { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: color-mix(in srgb,var(--surface) 85%,transparent); font: 22px 'Space Grotesk',sans-serif; }
+  .sidebar-item.active .sidebar-glyph { background: color-mix(in srgb,var(--accent) 13%,var(--surface-solid)); }
+  .sidebar-divider { height: 1px; margin: 4px 8px 0; background: var(--line); }
+  .sidebar-secondary .sidebar-item { min-height: 42px; font-size: 12px; }
+  .sidebar-secondary .sidebar-glyph { width: 31px; height: 31px; font-size: 19px; }
+  .sidebar-foot { display: flex; align-items: center; gap: 10px; margin-top: auto; padding: 13px 11px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+  .sidebar-live-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px color-mix(in srgb,var(--green) 17%,transparent); }
+  .sidebar-foot strong,.sidebar-foot small { display: block; }
+  .sidebar-foot strong { font: 800 9px var(--mono); letter-spacing: .08em; }
+  .sidebar-foot small { margin-top: 4px; color: var(--muted); font: 8px var(--mono); letter-spacing: .06em; }
+  .app-main.has-desktop-sidebar { left: var(--sidebar-width); bottom: 0; }
+  .bottom-nav { display: none; }
+  .world-loading-badge { left: calc(var(--sidebar-width) + 16px); bottom: 16px; }
+  .onboarding-skip { display: inline-flex; }
+}
+@media (min-width: 761px) and (max-width: 1023px) {
+  :root { --sidebar-width: 76px; }
+  .desktop-sidebar { position: fixed; z-index: 46; top: calc(var(--header-height) + env(safe-area-inset-top)); bottom: 0; left: 0; width: var(--sidebar-width); display: flex; flex-direction: column; gap: 9px; padding: 15px 8px; border-right: 1px solid var(--line); background: color-mix(in srgb,var(--surface-solid) 95%,transparent); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); pointer-events: auto; }
+  .sidebar-kicker { display: none; }
+  .sidebar-section-label { width: 100%; overflow: hidden; text-align: center; color: var(--muted); font: 8px var(--mono); letter-spacing: .06em; }
+  .sidebar-nav { display: grid; gap: 6px; }
+  .sidebar-item { width: 100%; min-height: 47px; display: grid; place-items: center; padding: 4px; border: 1px solid transparent; border-radius: 12px; background: transparent; color: var(--muted); }
+  .sidebar-item.active { border-color: color-mix(in srgb,var(--accent) 23%,transparent); background: var(--accent-soft); color: var(--accent-strong); }
+  .sidebar-glyph { font: 23px 'Space Grotesk',sans-serif; }
+  .sidebar-item-label,.sidebar-divider,.sidebar-foot { display: none; }
+  .app-main.has-desktop-sidebar { left: var(--sidebar-width); bottom: 0; }
+  .bottom-nav { display: none; }
+  .world-loading-badge { left: calc(var(--sidebar-width) + 12px); bottom: 12px; }
+}
+@media (max-width: 760px) {
+  .desktop-sidebar { display: none !important; }
+  .app-main.has-desktop-sidebar { left: 0; bottom: calc(var(--nav-height) + env(safe-area-inset-bottom)); }
+  .bottom-nav { display: grid; }
+  .onboarding-main { overflow: hidden !important; }
+  .app-main.onboarding-main { overflow: hidden !important; }
+  .onboarding-screen { height: 100%; min-height: 0; padding: 9px 12px 10px; justify-content: flex-start; overflow: hidden; }
+  .onboarding-scene-note { flex: 0 0 auto; margin-bottom: 7px; font-size: 8px; gap: 7px; }
+  .onboarding-skip { display: inline-flex; flex: 0 0 auto; min-height: 32px; padding: 0 11px; border: 1px solid rgba(255,255,255,.32); border-radius: 99px; background: rgba(9,22,34,.58); color: #fff; font-size: 11px; font-weight: 800; }
+  .onboarding-layout { flex: 1 1 auto; min-height: 0; gap: 8px; overflow: hidden; }
+  .onboarding-progress { flex: 0 0 auto; padding: 8px 11px; border-radius: 13px; }
+  .progress-header { margin-bottom: 7px; font-size: 9px; }
+  .onboarding-step { display: none; }
+  .onboarding-track { height: 4px; }
+  .onboard-art-copy { min-height: 0; overflow: hidden; }
+  .onboard-art-copy h1 { margin: 7px 0 6px; font-size: clamp(30px,8vw,43px); line-height: .98; }
+  .onboard-art-copy > p { margin: 5px 0 9px; font-size: 13px; line-height: 1.35; }
+  .onboard-tip { display: none; }
+  .crew-intro-strip { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 5px; margin: 9px 0; }
+  .crew-mini { min-width: 0; padding: 6px 8px; gap: 7px; }
+  .crew-mini > span { width: 31px; height: 31px; }
+  .crew-mini strong { font-size: 11px; }
+  .crew-mini small { font-size: 9px; }
+  .planet-pick-grid { gap: 6px; }
+  .planet-pick { min-height: 112px; padding: 7px 4px; }
+  .planet-pick .planet-orb { width: 43px; height: 43px; }
+  .planet-pick small,.planet-pick i { font-size: 8px; }
+  .training-stations { gap: 6px; }
+  .training-station { min-height: 53px; grid-template-columns: 35px minmax(0,1fr) auto; padding: 6px 8px; }
+  .training-station > span { width: 32px; height: 32px; }
+  .training-station strong { font-size: 13px; }
+  .training-station small { font-size: 10px; line-height: 1.25; }
+  .training-station > b { font-size: 8px; }
+  .onboard-actions { margin-top: 7px; gap: 6px; }
+  .onboard-actions .primary-button,.onboard-actions .quiet-button { min-height: 41px; padding-inline: 13px; font-size: 12px; }
+  .onboard-completion { display: block; margin-top: 4px; font-size: 9px; }
+  .onboarding-brand { flex: 0 0 auto; margin-top: 5px; font-size: 8px; }
+  .onboard-guided-controls { flex: 0 0 auto; margin-top: 7px; gap: 6px; }
+  .onboard-guided-controls .interaction-hint { min-height: 45px; padding: 6px 9px; }
+  .onboard-guided-controls .interaction-hint strong { font-size: 12px; }
+  .onboard-guided-controls .interaction-hint small { font-size: 10px; }
+  .onboard-touch-controls .touch-joystick { width: 76px; height: 76px; }
+  .onboard-touch-controls > button { min-height: 42px; min-width: 112px; font-size: 12px; }
+}
+@media (max-width: 390px) {
+  .onboarding-scene-note span:nth-of-type(2) { display: none; }
+  .onboard-art-copy h1 { font-size: 32px; }
+  .onboard-touch-controls .touch-joystick { width: 68px; height: 68px; }
+}
+.touch-joystick { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+
+@media (max-width: 760px) { .onboard-touch-controls .joystick-knob { width: 30px; height: 30px; margin: -15px; } }
+
+/* Pages without a navigation dock use the full height below the header. */
+.app-main.main-without-navigation { bottom: 0; }
+.app-main.onboarding-main { bottom: 0; overflow: hidden !important; }
