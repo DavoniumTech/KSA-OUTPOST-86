@@ -1,6 +1,11 @@
 const SESSION_COOKIE = 'ksa_session';
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+// Firebase refresh tokens silently renew this shorter HttpOnly game session.
+const SESSION_TTL_SECONDS = 60 * 60 * 24;
 const encoder = new TextEncoder();
+
+// Firebase web API keys identify the project; they are public client configuration,
+// not service-account credentials. Restrict this key to Identity Toolkit API usage.
+const FIREBASE_WEB_API_KEY = 'AIzaSyAFmEWLoJWW14Y10NBqGBBQ128aeD_dh98';
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
@@ -42,6 +47,56 @@ async function authenticatedUser(request, env) {
   return payload.user || null;
 }
 
+async function lookupVerifiedFirebaseIdentity(idToken) {
+  if (typeof idToken !== 'string' || idToken.length < 100 || idToken.length > 16_384) {
+    return { user: null, status: 401, error: 'A valid Firebase sign-in token is required.' };
+  }
+  let response;
+  try {
+    response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(FIREBASE_WEB_API_KEY)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+      signal: AbortSignal.timeout(8_000),
+    });
+  } catch {
+    return { user: null, status: 503, error: 'Firebase identity verification is temporarily unavailable.' };
+  }
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const status = response.status === 429 || response.status >= 500 ? 503 : 401;
+    return { user: null, status, error: status === 503 ? 'Firebase identity verification is temporarily unavailable.' : 'Firebase could not verify this sign-in. Please sign in again.' };
+  }
+  const user = Array.isArray(payload.users) ? payload.users[0] : null;
+  if (!user || user.disabled || !user.localId || !user.email) {
+    return { user: null, status: 401, error: 'The Firebase account is invalid or disabled.' };
+  }
+  if (user.emailVerified !== true) {
+    return { user: null, status: 403, error: 'Verify your email address before entering the outpost.' };
+  }
+  return { user, status: 200, error: null };
+}
+
+async function createFirebaseGameSession(firebaseUser, env) {
+  const email = String(firebaseUser.email || '').trim().toLowerCase();
+  const uid = String(firebaseUser.localId || '');
+  const displayName = String(firebaseUser.displayName || '').trim().replace(/[<>]/g, '').slice(0, 40);
+  if (!email || !uid || email.length > 190) return json({ error: 'Firebase did not return a usable commander identity.' }, 401);
+  const shard = shardFor(email);
+  const forwarded = new Request('https://auth.internal/firebase-session', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-auth-shard': String(shard) },
+    body: JSON.stringify({ uid, email, name: displayName }),
+  });
+  const response = await authStub(env, shard).fetch(forwarded);
+  const payload = await response.json().catch(() => ({ error: 'Could not create the game session.' }));
+  if (!response.ok) return json(payload, response.status);
+  if (!payload.sessionToken) return json({ error: 'The game session was not created.' }, 502);
+  const sessionToken = payload.sessionToken;
+  delete payload.sessionToken;
+  return json(payload, response.status, { 'set-cookie': cookieFor(sessionToken) });
+}
+
 function cookieFor(token) {
   return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`;
 }
@@ -79,10 +134,26 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     if (path === '/api/health') {
-      return json({ ok: true, service: 'ksa-outpost-86-api', version: 3, accounts: true, playerSaves: true, liveEvents: true });
+      return json({ ok: true, service: 'ksa-outpost-86-api', version: 4, accounts: true, firebaseAuth: true, playerSaves: true, liveEvents: true });
     }
-    if (path === '/api/auth/register' && request.method === 'POST') return forwardAuth(request, env, '/register');
-    if (path === '/api/auth/login' && request.method === 'POST') return forwardAuth(request, env, '/login');
+    if ((path === '/api/auth/register' || path === '/api/auth/login') && request.method === 'POST') {
+      return json({ error: 'Password registration and sign-in have moved to Firebase Authentication. Update the application and use the Firebase account screen.' }, 410);
+    }
+    if (path === '/api/auth/firebase/session' && request.method === 'POST') {
+      const origin = request.headers.get('origin');
+      if (origin !== url.origin) return json({ error: 'Cross-origin sign-in requests are not accepted.' }, 403);
+      const declaredLength = Number(request.headers.get('content-length') || 0);
+      if (declaredLength > 24_000) return json({ error: 'Firebase sign-in token request is too large.' }, 413);
+      const rawBody = await request.text();
+      if (new TextEncoder().encode(rawBody).byteLength > 24_000) {
+        return json({ error: 'Firebase sign-in token request is too large.' }, 413);
+      }
+      let input = null;
+      try { input = JSON.parse(rawBody); } catch { /* Invalid JSON is rejected by token validation below. */ }
+      const verified = await lookupVerifiedFirebaseIdentity(input?.idToken);
+      if (!verified.user) return json({ error: verified.error }, verified.status);
+      return createFirebaseGameSession(verified.user, env);
+    }
     if (path === '/api/auth/me' && request.method === 'GET') {
       const token = getCookie(request, SESSION_COOKIE);
       if (!token) return json({ user: null }, 401);
@@ -152,6 +223,10 @@ export class AuthIndex {
       created_at INTEGER NOT NULL
     )`);
     sql.exec('CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at INTEGER NOT NULL)');
+    // Existing v3.7 commander records are linked by their verified email on
+    // first Firebase sign-in, preserving their existing player-save namespace.
+    try { sql.exec('ALTER TABLE users ADD COLUMN firebase_uid TEXT'); } catch { /* Column already exists on this Durable Object shard. */ }
+    sql.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_firebase_uid_idx ON users(firebase_uid) WHERE firebase_uid IS NOT NULL');
     sql.exec('CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id)');
     sql.exec('CREATE TABLE IF NOT EXISTS auth_attempts (email TEXT PRIMARY KEY, failures INTEGER NOT NULL, window_started_at INTEGER NOT NULL)');
   }
@@ -162,12 +237,48 @@ export class AuthIndex {
     // another concurrent request's shard.
     const shard = Number(request.headers.get('x-auth-shard') || 0);
     const path = new URL(request.url).pathname;
-    if (path === '/register' && request.method === 'POST') return this.register(request, shard);
-    if (path === '/login' && request.method === 'POST') return this.login(request, shard);
+    if (path === '/firebase-session' && request.method === 'POST') return this.firebaseSession(request, shard);
+    if (path === '/register' || path === '/login') return json({ error: 'Use Firebase Authentication for new sign-in sessions.' }, 410);
     if (path === '/me' && request.method === 'GET') return this.me(request);
     if (path === '/logout' && request.method === 'POST') return this.logout(request);
     if (path === '/profile' && request.method === 'PATCH') return this.updateProfile(request);
     return json({ error: 'Unknown authentication operation.' }, 404);
+  }
+
+  async firebaseSession(request, shard) {
+    const input = await request.json().catch(() => null);
+    const uid = String(input?.uid || '').trim();
+    const email = String(input?.email || '').trim().toLowerCase();
+    const proposedName = String(input?.name || '').trim().replace(/[<>]/g, '').slice(0, 40);
+    if (!uid || uid.length > 128 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 190) {
+      return json({ error: 'Firebase returned an invalid commander identity.' }, 400);
+    }
+    const sql = this.ctx.storage.sql;
+    let row = sql.exec('SELECT * FROM users WHERE firebase_uid = ?', uid).toArray()[0];
+    if (!row) row = sql.exec('SELECT * FROM users WHERE email = ?', email).toArray()[0];
+    if (row?.firebase_uid && row.firebase_uid !== uid) {
+      return json({ error: 'This commander email is already linked to a different Firebase identity. Contact support before changing sign-in providers.' }, 409);
+    }
+    if (row) {
+      // Preserve the old internal player id, so any existing cloud saves and
+      // mission events remain attached to this commander profile. Keep the
+      // email current if the verified Firebase identity has changed it.
+      const conflictingEmail = sql.exec('SELECT id FROM users WHERE email = ? AND id <> ?', email, row.id).toArray()[0];
+      if (conflictingEmail) return json({ error: 'This email is already attached to a different commander profile.' }, 409);
+      const name = row.name || proposedName || email.split('@')[0].slice(0, 40);
+      sql.exec('UPDATE users SET firebase_uid = ?, email = ?, name = ? WHERE id = ?', uid, email, name, row.id);
+      row = sql.exec('SELECT * FROM users WHERE id = ?', row.id).toArray()[0];
+    } else {
+      const name = proposedName || email.split('@')[0].slice(0, 40) || 'Commander';
+      const avatar = name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || '86';
+      const id = crypto.randomUUID();
+      sql.exec(
+        'INSERT INTO users (id,email,name,avatar,theme,password_hash,salt,onboarding_complete,created_at,firebase_uid) VALUES (?,?,?,?,?,?,?,?,?,?)',
+        id, email, name, avatar, 'light', '', '', 0, Date.now(), uid,
+      );
+      row = sql.exec('SELECT * FROM users WHERE id = ?', id).toArray()[0];
+    }
+    return this.createSession(publicUser(row), shard);
   }
 
   async register(request, shard) {

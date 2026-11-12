@@ -1,35 +1,32 @@
-KSA OUTPOST 86 — VERSION 3.6.0
-ORBITAL FRONTIER — FINAL COMPETITION POLISH
+KSA OUTPOST 86
+VERSION 3.9.0 — MISSION CONTROL, LIVE DEMO AND GOOGLE SIGN-IN
 
 Repository: https://github.com/DavoniumTech/KSA-OUTPOST-86.git
 Target branch: main
+Foundation: saved V3.8.0 Firebase integration package and existing V3.7 responsive 3D upgrade.
 
-V3.6.0 includes:
-- Original KSA orbital brand emblem and release label.
-- Correct crew roster: Al-Amin (Commander), Imran (Pilot), Shuaib (Systems Engineer), Jafar (Science Specialist).
-- Safe migration of previous crew assignment identifiers and avatar initials.
-- Prominent Play now · 5-minute demo home action.
-- Working notification close and mission-journal actions, outside-click and Escape dismissal.
-- Service worker shell v10: network-first navigation HTML, cache fallback, API no-cache and old-shell cleanup.
-- Lazy Babylon.js runtime and on-demand Mars regolith albedo, normal and roughness maps.
-- Animated Mars relay satellite and slow asteroid-belt drift.
-- Better mobile mission HUD and readable touch targets.
-- Performance-first graphics profile on compact devices, pause rendering while hidden or on non-game views.
-- Earth/Moon/Mars scenes, rocket workshop and launch sequence, astronaut movement, habitat interactions, rover drive/scan, seven-day lunar and Mars campaigns, XP/badges, three themes, local guest saves and Lunar Lander Lab retained.
-- Cloudflare Worker source for optional authenticated player profile/save/event sync; requires deployed Worker, Durable Object bindings, correct route and GitHub Action secrets.
+V3.9.0 includes:
+- The supplied Google OAuth Web Client ID configured in the frontend.
+- Firebase email/password registration, verification, password reset and Google Identity Services exchange (Google provider must be enabled in Firebase).
+- Cloudflare Worker Firebase ID-token verification and secure HttpOnly game session.
+- Existing Babylon.js renderer, lunar/Mars missions, crew, rover, local saves, journal, lander lab and PWA retained.
+- Explicit launch/journey return values, automatic scene rebuild/retry and 25-second in-app recovery from a stuck flight callback.
+- Actual five-minute Mars demo timer starting after simulated touchdown, four objective states, persistence and Journal debrief.
+- Flight sequence checklist, clearer mission screens, bigger universe loading title, and service worker cache v13.
 
-Validation actually executed in the release workspace:
-- TypeScript typecheck: PASS.
-- Existing automated tests: 42/42 PASS.
-- Worker JavaScript syntax: PASS.
-- Service-worker JavaScript syntax: PASS.
-- ZIP integrity: verified during packaging.
-- Vite production bundle: NOT RUN; npm dependencies could not be installed because the package registry was unavailable.
-- Real Android/browser performance measurements: NOT RUN.
-- GitHub push / Cloudflare deployment: NOT performed by this workspace.
+Validation in this packaging environment:
+- Automated tests: 61/61 passed.
+- TypeScript check: global TypeScript 5.8.3, tsc --noEmit passed. The project lockfile pins TypeScript 5.9.3.
+- npm ci: timed out while accessing the npm package registry.
+- Vite production build: not run; Vite dependencies are unavailable in this environment.
+- Browser/Android runtime testing: not performed.
+- GitHub push and Cloudflare deployment: not performed.
 
-Science/asset honesty:
-- Mars surface textures are original procedural game art, not NASA imagery.
-- Planetary terrain and spacecraft/astronaut models are procedural educational visuals, not flight-qualified or photogrammetric assets.
-- Challenge-specific NASA Resources dataset integration must be checked and cited separately before making an eligibility claim.
-- See docs/LIMITATIONS.md, docs/SCIENCE.md and docs/ASSETS.md.
+Before live use:
+- Enable Firebase Email/Password and Google providers.
+- Confirm the production host is an authorized Firebase domain and Google JavaScript origin.
+- Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as GitHub Actions repository secrets so the workflow can deploy the Worker.
+- Use scripts/Deploy-To-GitHubMain.ps1; it runs npm ci and npm run build before changing the existing main checkout.
+- Check the GitHub Actions job and Cloudflare Worker deployment after pushing. A Git push alone is not deployment proof.
+
+No service-account private key, OAuth client secret, .env.production file or .dev.vars file is included.

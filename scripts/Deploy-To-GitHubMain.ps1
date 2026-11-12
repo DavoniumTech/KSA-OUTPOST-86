@@ -157,8 +157,8 @@ if (-not (Test-Path -LiteralPath (Join-Path $resolvedPackage 'src/main.ts'))) {
     throw "Package root does not contain src/main.ts: $resolvedPackage"
 }
 $packageMetadata = Get-Content -LiteralPath (Join-Path $resolvedPackage 'package.json') -Raw | ConvertFrom-Json
-if ($packageMetadata.version -ne '3.7.0') {
-    throw "Expected KSA OUTPOST 86 package version 3.7.0; found '$($packageMetadata.version)'."
+if ($packageMetadata.version -ne '3.9.0') {
+    throw "Expected KSA OUTPOST 86 package version 3.9.0; found '$($packageMetadata.version)'."
 }
 if (-not (Test-Path -LiteralPath (Join-Path $resolvedPackage 'package-lock.json'))) {
     throw 'The package must include package-lock.json so the exact dependency tree can be installed.'
@@ -166,6 +166,12 @@ if (-not (Test-Path -LiteralPath (Join-Path $resolvedPackage 'package-lock.json'
 
 # Validate the exact packaged project before touching the user's checkout.
 # A failed install, typecheck, test, or production build must never be pushed.
+# A local .env.production stays in the existing checkout (and is gitignored);
+# copy it only into the temporary build tree so Vite can configure Google GSI.
+$localProductionEnv = Join-Path $resolvedRepo '.env.production'
+if ([string]::IsNullOrWhiteSpace($env:VITE_FIREBASE_GOOGLE_CLIENT_ID) -and (Test-Path -LiteralPath $localProductionEnv)) {
+    Copy-Item -LiteralPath $localProductionEnv -Destination (Join-Path $resolvedPackage '.env.production') -Force
+}
 $nodeVersionResult = Invoke-Native -Executable 'node' -Arguments @('--version')
 $nodeVersionText = (($nodeVersionResult.Output | Select-Object -First 1).Trim() -replace '^v', '')
 try {
@@ -277,7 +283,7 @@ try {
         throw "Potential secret files are staged. Deployment stopped: $($secretFiles -join ', ')"
     }
 
-    Invoke-Git -Arguments @('commit', '-m', 'feat: KSA Outpost 86 v3.7 responsive 3D frontier upgrade') | Out-Null
+    Invoke-Git -Arguments @('commit', '-m', 'feat: KSA Outpost 86 v3.9 mission flow and Google authentication') | Out-Null
     Invoke-Git -Arguments @('push', 'origin', 'main') | Out-Null
 
     $localHead = (Invoke-Git -Arguments @('rev-parse', 'HEAD') | Select-Object -First 1).Trim()

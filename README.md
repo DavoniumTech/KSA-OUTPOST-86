@@ -1,4 +1,4 @@
-# KSA OUTPOST 86 — Version 3.7.0
+# KSA OUTPOST 86 — Version 3.9.0
 
 ## ORBITAL FRONTIER · A playable planetary adventure
 
@@ -65,7 +65,7 @@ Open **More → Settings** to choose one of three live themes:
 
 Guest play is available and stores progress in the current browser. Create an account from the profile/account screen to enable server-backed profile, save and mission-event synchronisation **after the Cloudflare Worker/API has been deployed and configured**. Guest data does not synchronise across devices.
 
-The account API uses a secure HttpOnly session cookie, PBKDF2 password hashing, per-email failed-login throttling, and user-keyed Durable Objects for saves and events. The current build does **not** include email verification, email-based password reset, or Web Push delivery after the browser is completely closed. Browser notifications can be enabled for important events while the tab is in the background; live events can reach another active signed-in session over WebSocket.
+Firebase Authentication manages account passwords and identity. The Cloudflare Worker independently checks the Firebase ID token and issues a Secure, HttpOnly, SameSite=Lax game-session cookie only after the account is verified and enabled. The Worker does not receive or store the user's password. Existing commander records can be linked by the same verified email while preserving their player-save ID. Browser notifications can be enabled for important events while the tab is in the background; live events can reach another active signed-in session over WebSocket.
 
 ## V3.7 release and mobile notes
 
@@ -90,7 +90,7 @@ The account API uses a secure HttpOnly session cookie, PBKDF2 password hashing, 
 - The Moon's existing procedural terrain now includes additional small impact features. Its regolith uses local compressed albedo, normal and roughness maps, loaded only when the Moon scene is selected.
 - The oxygen console now has a recognizable 3D pair of pressure vessels, manifold, valve and status bands.
 - The three-screen onboarding keeps Skip visible on phones, avoids an internal scroll area, and labels the final action **Start Exploring**.
-- Lunar textures are converted to WebP for smaller on-demand transfers. The initial app-shell cache is versioned as v11.
+- Lunar textures are converted to WebP for smaller on-demand transfers. The initial app-shell cache was versioned as v11 in the V3.7 release.
 
 ## Technology
 
@@ -117,7 +117,7 @@ npm run dev
 
 ## Cloudflare online services
 
-The repository includes `worker/index.js` and `wrangler.jsonc`. The Worker defines `/api/health`, account registration/sign-in/profile/logout, private player saves, mission event history and per-player WebSocket live updates. Durable Object bindings and a V3 migration are declared in `wrangler.jsonc`.
+The repository includes `worker/index.js` and `wrangler.jsonc`. The Worker defines `/api/health`, Firebase ID-token verification and game-session creation, profile/logout, private player saves, mission event history and per-player WebSocket live updates. The legacy password registration/login endpoints are disabled; Firebase manages credentials. Durable Object bindings and a V3 migration are declared in `wrangler.jsonc`.
 
 The existing GitHub Actions workflow continues to deploy GitHub Pages. Its optional Cloudflare Worker job runs only when both repository Actions secrets are configured:
 
@@ -136,3 +136,29 @@ After adding both secrets in GitHub repository Settings → Secrets and variable
 - [Babylon.js](https://www.babylonjs.com/) · [Documentation](https://doc.babylonjs.com/)
 
 These are scientific and technical references, not a claim that every procedural terrain or model in this build is NASA-sourced. Review `docs/ASSETS.md` and `docs/SCIENCE.md` for the assets and educational assumptions.
+
+
+## Firebase commander accounts (v3.9.0)
+
+The application uses Firebase Authentication for email/password accounts, email verification, password reset and Google sign-in. Firebase is the identity provider; the existing Cloudflare Worker and Durable Objects continue to store commander profiles, mission saves and live events. The Worker verifies Firebase ID tokens with the project's Firebase `accounts:lookup` endpoint and only issues its Secure, HttpOnly game session for an account whose email is verified. The Firebase REST endpoints are used directly, so the project does not add a second client SDK or increase the initial JavaScript bundle with a duplicate auth library.
+
+See [`docs/FIREBASE-AUTH-SETUP.md`](docs/FIREBASE-AUTH-SETUP.md) before deploying. Google sign-in now has the Web Client ID supplied for the `KSA OUTPOST 86` Firebase project, with an optional `VITE_FIREBASE_GOOGLE_CLIENT_ID` environment override. The Google provider must still be enabled in Firebase Authentication, and the production domain must be listed under Authorized domains. Never add an OAuth client secret to the frontend. See `docs/FIREBASE-AUTH-SETUP.md`.
+
+
+## Firebase account security notes
+
+- Firebase Web API configuration is public client configuration, not a service-account secret. Restrict the API key to the Identity Toolkit API and Secure Token API because the browser uses both authentication and refresh-token endpoints, while the Cloudflare Worker verifies identities through Identity Toolkit. Do not use an HTTP-referrer restriction on the shared key while it is also used by the Worker.
+- Add only the production host to Firebase Authorized domains for production. Add `localhost` manually only for local development; Firebase no longer adds it automatically for projects created after April 28, 2025.
+- The Google Web Client ID is public. Never place the OAuth client secret, service-account JSON, ID token or refresh token into frontend source or Git.
+- V3.9.0 uses service-worker cache version v13 so existing clients fetch the new application shell.
+
+
+## V3.9.0 mission control and demo flow
+
+- The rocket API reports whether launch and journey animations actually started. Mission Control rebuilds and retries a failed launch setup instead of silently remaining in a busy state.
+- A 25-second watchdog restores the selected planetary scene in-app if an animation callback does not arrive; the player is not asked to refresh the page.
+- Rocket launch, touchdown, recovery and demo debrief events are written to the existing mission journal. Simulation actions continue writing their normal mission log entries.
+- The advertised five-minute demo is now a timed session that begins after touchdown, shows four real objectives, persists its state, records the debrief and leaves the seven-day campaign available afterward.
+- The mission control screen uses a clearer visible flight checklist, and the initial “Preparing your universe” status is larger and easier to read.
+
+The V3.9.0 automated suite contains 61 tests. `npm run build` must still be run in a workspace that can install the pinned Vite and Babylon dependencies before deployment.

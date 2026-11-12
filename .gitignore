@@ -7,3 +7,8 @@ Thumbs.db
 .vscode/
 .idea/
 *.local
+
+# Local Firebase / Cloudflare credentials and build-time environment.
+.env*
+!.env.example
+.dev.vars*

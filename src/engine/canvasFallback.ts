@@ -253,11 +253,12 @@ export function createCanvasFallback(canvas: HTMLCanvasElement, reducedMotion: b
     setSceneMode(mode) { sceneMode = mode; journeyTarget = null; playerControlled = false; vehicleMode = false; },
     focusCelestial(name) { solarFocus = name.toLowerCase(); },
     setRocketConfiguration(config) { rocketConfiguration = { ...config }; },
-    launchRocket(destination, onComplete) {
-      if (sceneMode !== 'rocket' || !rocketConfiguration.crewCapsule || !rocketConfiguration.mainEngine || !rocketConfiguration.fuelTank || !rocketConfiguration.communications) return;
+    launchRocket(destination, onComplete): boolean {
+      if (sceneMode !== 'rocket' || !rocketConfiguration.crewCapsule || !rocketConfiguration.mainEngine || !rocketConfiguration.fuelTank || !rocketConfiguration.communications) return false;
       rocketLiftStart = performance.now(); rocketLiftCallback = onComplete;
       const finish = (): void => { if (!rocketLiftStart) return; if (performance.now() - rocketLiftStart >= 2600) { rocketLiftStart = 0; sceneMode = 'planetary'; planet = 'earth'; rocketLiftCallback?.(); rocketLiftCallback = undefined; } else requestAnimationFrame(finish); };
       requestAnimationFrame(finish); void destination;
+      return true;
     },
     setPaused(value) { paused = value; },
     setGraphicsQuality(value) { quality = value; resize(); },
@@ -277,7 +278,7 @@ export function createCanvasFallback(canvas: HTMLCanvasElement, reducedMotion: b
     activateStation(id) { solarFocus = id; },
     deployRover() { roverDeployed = true; roverX = Math.min(52, roverX + 16); },
     driveRover(direction) { if (roverDeployed) roverX = Math.max(-50, Math.min(50, roverX + Math.sign(direction) * 9)); },
-    playJourney(destination, onComplete) { if (reduced) { planet = destination; onComplete?.(); return; } journeyTarget = destination; journeyStart = performance.now(); journeyCallback = onComplete; paused = false; },
+    playJourney(destination, onComplete): boolean { if (reduced) { planet = destination; onComplete?.(); return true; } journeyTarget = destination; journeyStart = performance.now(); journeyCallback = onComplete; paused = false; return true; },
     destroy() { cancelAnimationFrame(frame); window.removeEventListener('resize', resize); },
   };
 }

@@ -11,7 +11,7 @@ export interface BabylonWorld {
   setSceneMode(mode: SceneMode): void;
   focusCelestial(name: string): void;
   setRocketConfiguration(config: RocketConfiguration): void;
-  launchRocket(destination: Planet, onComplete?: () => void): void;
+  launchRocket(destination: Planet, onComplete?: () => void): boolean;
   setPaused(paused: boolean): void;
   setGraphicsQuality(quality: GraphicsQuality): void;
   setReducedMotion(reduced: boolean): void;
@@ -30,7 +30,7 @@ export interface BabylonWorld {
   exitHabitat(): void;
   focusStation(id: string): void;
   activateStation(id: string): void;
-  playJourney(destination: Planet, onComplete?: () => void): void;
+  playJourney(destination: Planet, onComplete?: () => void): boolean;
   destroy(): void;
   readonly rendererName: string;
 }
@@ -1518,10 +1518,17 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
       camera.radius = Math.max(12, body.getBoundingInfo().boundingSphere.radiusWorld * 7.2);
     },
     setRocketConfiguration(config: RocketConfiguration) { rocketConfig = { ...config }; if (sceneMode === 'rocket') rebuildScene(planet); },
-    launchRocket(destination: Planet, onComplete?: () => void) {
-      if (sceneMode !== 'rocket' || !rocketConfig.crewCapsule || !rocketConfig.mainEngine || !rocketConfig.fuelTank || !rocketConfig.communications || !rocketRoot) return;
+    launchRocket(destination: Planet, onComplete?: () => void): boolean {
+      // Rebuild a missing rocket scene instead of silently returning and leaving
+      // Mission Control's launch overlay active forever.
+      if (sceneMode !== 'rocket' || !rocketRoot) {
+        sceneMode = 'rocket';
+        rebuildScene(planet);
+      }
+      if (!rocketConfig.crewCapsule || !rocketConfig.mainEngine || !rocketConfig.fuelTank || !rocketConfig.communications || !rocketRoot) return false;
       journeyDestination = destination; rocketLaunchElapsed = 0; rocketLaunchActive = true; rocketLaunchCallback = onComplete; paused = false;
       try { rocketExhaust?.start(); } catch { /* rocket motion remains playable without particles */ }
+      return true;
     },
     setPaused(value: boolean) {
       paused = value;
@@ -1625,16 +1632,19 @@ export async function createBabylonWorld(canvas: HTMLCanvasElement, options: Wor
       const station = stationRecords.find((item) => item.id === id);
       if (station && camera) camera.setTarget(new B.Vector3(station.position.x, station.position.y + 2, station.position.z));
     },
-    playJourney(destination: Planet, onComplete?: () => void) {
+    playJourney(destination: Planet, onComplete?: () => void): boolean {
       sceneMode = 'planetary';
-      if (destination === 'earth') { rebuildScene('earth'); onComplete?.(); return; }
+      if (destination === 'earth') { rebuildScene('earth'); onComplete?.(); return true; }
+      if (!scene || scene.isDisposed) return false;
       if (!spacecraftRoot) spacecraftRoot = createSpacecraft(B, scene, 42, -32);
+      if (!spacecraftRoot) return false;
       journeyDestination = destination;
       journeyElapsed = 0;
       journeyActive = true;
       journeyCallback = onComplete;
       paused = false;
       if (camera) { camera.radius = 110; camera.setTarget(new B.Vector3(-24, 1, 0)); }
+      return true;
     },
     destroy() {
       window.removeEventListener('resize', resizeHandler);

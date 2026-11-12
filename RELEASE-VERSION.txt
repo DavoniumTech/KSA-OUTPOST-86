@@ -1,6 +1,10 @@
-KSA OUTPOST 86 v3.7.0 — RESPONSIVE 3D FRONTIER UPGRADE
-Repository: https://github.com/DavoniumTech/KSA-OUTPOST-86.git
-Target branch: main
-Baseline: V3.6.0 final competition release
+KSA OUTPOST 86
+Release: V3.9.0 — Mission Control, five-minute demo and Google sign-in activation
 
-This archive contains local source changes. No GitHub push or Cloudflare deployment is implied.
+Google Sign-In Web Client ID is configured in the frontend source. It is a public OAuth client identifier, not a client secret. Keep OAuth client secrets, Firebase service-account keys and Cloudflare secrets out of source control.
+
+The five-minute demonstration starts after simulated planetary touchdown and records four mission actions: inspect habitat systems, set a power plan, deploy the rover and collect a science sample. Completing or timing out the demo records a mission debrief. The full seven-day campaign remains playable.
+
+The launch flow reports actual scene-start status, retries a failed scene initialization once and has a 25-second in-app recovery path that restores the selected world without a page refresh.
+
+Production build, browser QA, Android QA, remote push and Cloudflare deployment must be completed in the target environment before describing the release as deployed.

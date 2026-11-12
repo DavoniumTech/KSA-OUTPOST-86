@@ -24,6 +24,20 @@ import { createCanvasFallback } from '../engine/canvasFallback';
 import { createLanderState, startLander, stepLander, type LanderControls, type LanderState } from '../game/lander';
 import { DEFAULT_ROCKET, ROCKET_PARTS, buildStandardRocket, calculateRocketMetrics, type RocketConfiguration } from '../game/rocket';
 import { mapJoystickDisplacement } from '../game/controls';
+import { DEMO_TASKS, createDemoSession, demoRemainingSeconds, finishDemoSession, formatDemoTime, loadDemoSession, recordDemoTask, type DemoSession, type DemoTaskId } from '../game/demo';
+import {
+  clearFirebaseRefreshToken,
+  createFirebaseAccount,
+  exchangeGoogleCredential,
+  isGoogleSignInConfigured,
+  lookupFirebaseUser,
+  mountGoogleSignInButton,
+  refreshStoredFirebaseSession,
+  resendFirebaseVerification,
+  sendFirebasePasswordReset,
+  signInFirebaseWithPassword,
+  type FirebaseTokens,
+} from '../game/firebaseAuth';
 
 type Theme = 'light' | 'dark' | 'glass';
 type View = 'onboarding' | 'home' | 'universe' | 'rocket' | 'game' | 'missions' | 'worlds' | 'outpost' | 'crew' | 'explore' | 'science' | 'journal' | 'settings' | 'lander' | 'account';
@@ -52,7 +66,7 @@ const esc = (value: string): string => value.replace(/[&<>"']/g, (c) => ({ '&': 
 const clamp = (value: number): number => Math.max(0, Math.min(100, value));
 const planets: Planet[] = ['earth', 'moon', 'mars'];
 const ONBOARDING_KEY = 'ksa-outpost-86-onboarding-v35';
-const RELEASE_LABEL = 'V3.7 · RESPONSIVE 3D FRONTIER';
+const RELEASE_LABEL = 'V3.9 · MISSION CONTROL & LIVE DEMO';
 const crew: Array<{ id: string; name: string; role: CrewRole; skill: number; specialty: string; avatar: string }> = [
   { id: 'alamin', name: 'Al-Amin', role: 'Commander', skill: 94, specialty: 'Mission operations', avatar: 'AL' },
   { id: 'imran', name: 'Imran', role: 'Pilot', skill: 91, specialty: 'Flight operations', avatar: 'IM' },
@@ -97,7 +111,8 @@ let stationModal: StationId | null = null;
 let oxygenCalibration = '';
 let solarCalibration = '';
 let greenhouseCalibration = '';
-let authMode: 'login' | 'register' = 'login';
+let authMode: 'login' | 'register' | 'reset' = 'login';
+let verificationPendingEmail: string | null = null;
 let account: PlayerProfile | null = null;
 let accountBusy = false;
 let serverStatus: 'checking' | 'ready' | 'unavailable' = 'checking';
@@ -143,6 +158,13 @@ let rocketConfig: RocketConfiguration = (() => {
 let rocketLaunchBusy = false;
 let rocketCountdown = 0;
 let rocketCountdownTimer = 0;
+let rocketLaunchWatchdog = 0;
+let flightStatusText = 'Verifying crew, propulsion and navigation';
+const DEMO_STORAGE_KEY = 'ksa-outpost-86-demo-v1';
+let demoSession: DemoSession | null = (() => { try { return loadDemoSession(localStorage.getItem(DEMO_STORAGE_KEY)); } catch { return null; } })();
+let demoTimer = 0;
+let demoPendingLaunch = false;
+let demoSummaryLoggedAt = 0;
 function persistPlayerProgress(): void {
   try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(playerProgress)); } catch { /* progress remains in memory for this session */ }
   if (account) void syncPlayerSave();
@@ -192,6 +214,96 @@ function setTheme(value: Theme): void {
 function saveCurrentMission(): void {
   saveMission(mission); saveMarsMission(mars);
   if (account) void syncPlayerSave();
+}
+function recordMissionLog(title: string, detail: string): void {
+  const entry = { day: currentDay(), title, detail };
+  if (selectedPlanet === 'mars') {
+    mars = { ...mars, log: [entry, ...mars.log].slice(0, 60) };
+    saveMarsMission(mars);
+  } else {
+    mission = { ...mission, log: [entry, ...mission.log].slice(0, 60) };
+    saveMission(mission);
+  }
+  if (account) void syncPlayerSave();
+}
+function persistDemo(): void {
+  try {
+    if (demoSession) localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(demoSession));
+    else localStorage.removeItem(DEMO_STORAGE_KEY);
+  } catch { /* demo remains active in memory for this session */ }
+}
+function stopDemoClock(): void { if (demoTimer) window.clearInterval(demoTimer); demoTimer = 0; }
+function finishDemo(reason: 'manual' | 'timeout' | 'completed'): void {
+  if (!demoSession) return;
+  if (reason === 'manual' || reason === 'timeout') demoSession = finishDemoSession(demoSession, Date.now(), reason === 'timeout' ? 'timeout' : 'manual');
+  stopDemoClock();
+  persistDemo();
+  if (demoSummaryLoggedAt !== demoSession.startedAt) {
+    demoSummaryLoggedAt = demoSession.startedAt;
+    const result = `${demoSession.completedTasks.length}/${DEMO_TASKS.length} demo objectives recorded. ${reason === 'completed' ? 'All demo objectives completed.' : reason === 'timeout' ? 'The five-minute demo window ended; the full campaign remains available.' : 'The demo was ended by the commander.'}`;
+    recordMissionLog('Five-minute demo debrief', result);
+  }
+  render();
+  if (reason === 'completed') {
+    awardXP(50, 'Five-minute demonstration completed.');
+    toastMessage('Demo completed', 'All four objectives are recorded. Continue exploring the full Mars campaign.', 'success');
+  } else if (reason === 'timeout') toastMessage('Demo time complete', 'Your actions have been recorded. Continue the full campaign at your own pace.', 'info');
+  else toastMessage('Demo ended', 'Your completed actions have been saved to the mission journal.', 'info');
+}
+function markDemoTask(task: DemoTaskId): void {
+  if (!demoSession || demoSession.status !== 'active') return;
+  const priorCount = demoSession.completedTasks.length;
+  demoSession = recordDemoTask(demoSession, task);
+  if (demoSession.completedTasks.length === priorCount) return;
+  persistDemo();
+  if (demoSession.status === 'completed') finishDemo('completed');
+  else refreshDemoPanel();
+}
+function resumeDemoClock(): void {
+  if (!demoSession || demoSession.status !== 'active') return;
+  if (demoRemainingSeconds(demoSession) <= 0) { finishDemo('timeout'); return; }
+  stopDemoClock();
+  demoTimer = window.setInterval(() => {
+    if (!demoSession || demoSession.status !== 'active') { stopDemoClock(); return; }
+    if (demoRemainingSeconds(demoSession) <= 0) finishDemo('timeout');
+    else refreshDemoPanel();
+  }, 1000);
+}
+function startFiveMinuteDemo(): void {
+  demoSession = createDemoSession();
+  demoSummaryLoggedAt = 0;
+  persistDemo();
+  recordMissionLog('Five-minute demonstration started', 'First Light demo: inspect habitat systems, set a power profile, deploy the rover and record a science sample.');
+  resumeDemoClock();
+  render();
+  toastMessage('Five-minute demo started', 'Your timer begins now. Complete the four visible mission objectives.', 'success');
+}
+function renderDemoPanel(): string {
+  if (!demoSession) return '';
+  if (demoSession.status === 'active') {
+    const remaining = demoRemainingSeconds(demoSession);
+    return `<aside class="demo-mission-panel" aria-label="Five-minute demo objectives"><div class="demo-panel-head"><div><span class="eyebrow-pill">LIVE DEMONSTRATION</span><h3>FIRST FLIGHT · MARS</h3></div><strong id="demo-clock">${formatDemoTime(remaining)}</strong></div><div class="demo-time-track"><i style="width:${Math.max(0, Math.min(100, remaining / 300 * 100))}%"></i></div><div class="demo-task-list">${DEMO_TASKS.map((task, index) => { const done = demoSession!.completedTasks.includes(task.id); return `<div class="demo-task ${done ? 'done' : ''}" data-task="${task.id}"><span>${done ? '✓' : String(index + 1).padStart(2, '0')}</span><div><strong>${task.title}</strong><small>${task.detail}</small></div><b>${done ? 'DONE' : 'NEXT'}</b></div>`; }).join('')}</div><button class="demo-end-button" data-action="end-demo">End demo & save log</button></aside>`;
+  }
+  const status = demoSession.status === 'completed' ? 'DEMO COMPLETED' : demoSession.status === 'expired' ? 'DEMO TIME COMPLETE' : 'DEMO ENDED';
+  return `<aside class="demo-mission-panel demo-finished"><div class="demo-panel-head"><div><span class="eyebrow-pill">MISSION DEBRIEF</span><h3>${status}</h3></div><strong>${demoSession.completedTasks.length}/4</strong></div><p>Your demonstration actions are recorded in the mission journal. The seven-day campaign remains available.</p><button class="demo-end-button" data-action="dismiss-demo">Dismiss debrief</button></aside>`;
+}
+function refreshDemoPanel(): void {
+  const panel = document.querySelector<HTMLElement>('.demo-mission-panel');
+  if (!panel || !demoSession || demoSession.status !== 'active') return;
+  const clock = panel.querySelector<HTMLElement>('#demo-clock');
+  const remaining = demoRemainingSeconds(demoSession);
+  if (clock) clock.textContent = formatDemoTime(remaining);
+  const track = panel.querySelector<HTMLElement>('.demo-time-track > i');
+  if (track) track.style.width = `${Math.max(0, Math.min(100, remaining / 300 * 100))}%`;
+  for (const [index, task] of DEMO_TASKS.entries()) {
+    const row = panel.querySelector<HTMLElement>(`.demo-task[data-task="${task.id}"]`);
+    if (row) {
+      const done = demoSession.completedTasks.includes(task.id);
+      row.classList.toggle('done', done);
+      const marker = row.querySelector('span'); if (marker) marker.textContent = done ? '✓' : String(index + 1).padStart(2, '0');
+      const status = row.querySelector('b'); if (status) status.textContent = done ? 'DONE' : 'NEXT';
+    }
+  }
 }
 function toastMessage(title: string, body: string, tone: 'success' | 'warning' | 'info' = 'info', broadcast = true): void {
   toast = { title, body, tone };
@@ -298,7 +410,7 @@ function renderUniverse(): string {
 function renderRocketWorkshop(): string {
   const stats = rocketStats();
   const parts = ROCKET_PARTS.map((part) => `<button class="rocket-part ${rocketConfig[part.id] ? 'installed' : ''}" data-action="rocket-part" data-value="${part.id}" aria-pressed="${rocketConfig[part.id]}"><span class="rocket-part-check">${rocketConfig[part.id] ? '✓' : '+'}</span><span><strong>${part.title}</strong><small>${part.detail}</small></span><b>${rocketConfig[part.id] ? 'INSTALLED' : 'ADD PART'}</b></button>`).join('');
-  return `<section class="rocket-workshop-screen view-enter"><div class="rocket-workshop-shade"></div><div class="rocket-workshop-header"><div><span class="eyebrow-pill">FLIGHT OPERATIONS · VEHICLE ASSEMBLY</span><h1>Build your <em>rocket.</em></h1><p>Choose your spacecraft components, check the flight systems, then launch for ${selectedPlanet.toUpperCase()}.</p></div><div class="rocket-destination"><span>DESTINATION</span><strong>${selectedPlanet.toUpperCase()}</strong><button data-action="open-universe">Change world ↗</button></div></div><div class="rocket-workshop-layout"><div class="rocket-assembly-hint"><span class="rocket-live-dot"></span><strong>LIVE 3D ASSEMBLY</strong><small>Drag to inspect the vehicle. Select a component to add or remove it.</small><div class="rocket-specs"><div><strong>${stats.mass.toLocaleString()}</strong><small>KG · MASS</small></div><div><strong>${stats.fuel}%</strong><small>FUEL LOAD</small></div><div><strong>${stats.thrust}</strong><small>THRUST INDEX</small></div><div><strong>${stats.stability}%</strong><small>STABILITY</small></div></div></div><aside class="rocket-builder-panel"><div class="rocket-builder-title"><div><span class="eyebrow-pill">YOUR VEHICLE</span><h2>Expedition <em>MK-I</em></h2></div><span class="rocket-ready ${stats.readiness ? 'ready' : 'needs-work'}">${stats.readiness ? '● FLIGHT READY' : '● NEEDS PARTS'}</span></div><div class="rocket-parts-list">${parts}</div><div class="rocket-readiness ${stats.readiness ? 'ready' : ''}"><strong>${stats.readiness ? 'All essential systems ready.' : 'Complete your flight configuration.'}</strong><small>${stats.notes[0] ?? 'Run the pre-flight inspection.'}</small></div><div class="rocket-builder-actions"><button class="secondary-button" data-action="rocket-quick-build">Quick build</button><button class="primary-button" data-action="launch-rocket" ${!stats.readiness || rocketLaunchBusy ? 'disabled' : ''}>${rocketLaunchBusy ? `COUNTDOWN ${rocketCountdown || '…'}` : 'LAUNCH EXPEDITION'} <b>↗</b></button></div><small class="rocket-builder-foot">EDUCATIONAL FLIGHT MODEL · NOT REAL VEHICLE PERFORMANCE</small></aside></div>${rocketLaunchBusy ? `<div class="launch-countdown-overlay"><span>MISSION CONTROL</span><strong>${rocketCountdown || 'IGNITION'}</strong><p>Checking crew, propulsion and launch systems…</p></div>` : ''}<div class="rocket-workshop-bottom"><span>CREW MANIFEST · AMARA · MUHAMMAD · SHUAIB · JAFAR</span><button data-action="navigate" data-view="home">← Back to command deck</button></div></section>`;
+  return `<section class="rocket-workshop-screen view-enter"><div class="rocket-workshop-shade"></div><div class="rocket-workshop-header"><div><span class="eyebrow-pill">FLIGHT OPERATIONS · VEHICLE ASSEMBLY</span><h1>Build your <em>rocket.</em></h1><p>Choose your spacecraft components, check the flight systems, then launch for ${selectedPlanet.toUpperCase()}.</p></div><div class="rocket-destination"><span>DESTINATION</span><strong>${selectedPlanet.toUpperCase()}</strong><button data-action="open-universe">Change world ↗</button></div></div><div class="rocket-workshop-layout"><div class="rocket-assembly-hint"><span class="rocket-live-dot"></span><strong>LIVE 3D ASSEMBLY</strong><small>Drag to inspect the vehicle. Select a component to add or remove it.</small><div class="rocket-specs"><div><strong>${stats.mass.toLocaleString()}</strong><small>KG · MASS</small></div><div><strong>${stats.fuel}%</strong><small>FUEL LOAD</small></div><div><strong>${stats.thrust}</strong><small>THRUST INDEX</small></div><div><strong>${stats.stability}%</strong><small>STABILITY</small></div></div></div><aside class="rocket-builder-panel"><div class="rocket-builder-title"><div><span class="eyebrow-pill">YOUR VEHICLE</span><h2>Expedition <em>MK-I</em></h2></div><span class="rocket-ready ${stats.readiness ? 'ready' : 'needs-work'}">${stats.readiness ? '● FLIGHT READY' : '● NEEDS PARTS'}</span></div><div class="rocket-parts-list">${parts}</div><div class="rocket-readiness ${stats.readiness ? 'ready' : ''}"><strong>${stats.readiness ? 'All essential systems ready.' : 'Complete your flight configuration.'}</strong><small>${stats.notes[0] ?? 'Run the pre-flight inspection.'}</small></div><div class="rocket-builder-actions"><button class="secondary-button" data-action="rocket-quick-build">Quick build</button><button class="primary-button" data-action="launch-rocket" ${!stats.readiness || rocketLaunchBusy ? 'disabled' : ''}>${rocketLaunchBusy ? `COUNTDOWN ${rocketCountdown || '…'}` : 'LAUNCH EXPEDITION'} <b>↗</b></button></div><small class="rocket-builder-foot">EDUCATIONAL FLIGHT MODEL · NOT REAL VEHICLE PERFORMANCE</small></aside></div>${rocketLaunchBusy ? `<div class="launch-countdown-overlay"><span>MISSION CONTROL · FLIGHT SEQUENCE</span><strong>${rocketCountdown ? String(rocketCountdown).padStart(2, '0') : 'IGNITION'}</strong><p>${esc(flightStatusText)}</p><div class="launch-checklist"><span class="checked">✓ Crew manifest</span><span class="checked">✓ Propulsion & fuel</span><span class="checked">✓ Navigation link</span><span>↗ ${rocketCountdown ? 'Awaiting engine start' : 'Engines firing'}</span></div></div>` : ''}<div class="rocket-workshop-bottom"><span>CREW MANIFEST · AL-AMIN · IMRAN · SHUAIB · JAFAR</span><button data-action="navigate" data-view="home">← Back to command deck</button></div></section>`;
 }
 
 function renderObjectiveCard(): string {
@@ -308,7 +420,7 @@ function renderObjectiveCard(): string {
 }
 function renderGame(): string {
   const resources = currentResources();
-  return `<section class="game-view"><div class="game-scene-label"><span class="scene-pulse"></span> THIRD-PERSON EXPLORATION <i></i><b>${selectedPlanet.toUpperCase()} SURFACE</b></div><div class="game-left-hud"><div class="game-day-pill">MISSION DAY <strong>${currentDay()} / 07</strong></div>${renderObjectiveCard()}<div class="game-resource-stack">${resources.map((r) => `<div class="game-resource"><span class="resource-icon">${r.id === 'oxygen' ? 'O₂' : r.id === 'power' ? 'ϟ' : r.id === 'water' ? 'H₂O' : '✿'}</span><div><div class="resource-meter-label"><span>${r.label}</span><strong>${Math.round(r.value)}%</strong></div><div class="resource-track"><i class="${r.value < 24 ? 'critical' : r.value < 48 ? 'caution' : 'healthy'}" style="width:${clamp(r.value)}%"></i></div></div></div>`).join('')}</div></div><div class="game-right-hud"><button data-action="camera" data-value="overview">◎ OVERVIEW</button><button data-action="camera" data-value="habitat">⌂ HABITAT</button><button data-action="camera" data-value="horizon">◇ HORIZON</button><button data-action="pause-game">Ⅱ PAUSE</button></div><div class="game-bottom-hud"><div id="interaction-hint" class="interaction-hint"><span class="keycap">E</span><div><strong>Explore the outpost</strong><small>Walk towards a glowing station to interact</small></div></div><div class="movement-legend"><kbd>W A S D</kbd><span>MOVE</span><kbd>SHIFT</kbd><span>RUN</span><kbd>SPACE</kbd><span>JUMP</span><kbd>E</kbd><span>INTERACT</span><kbd>ESC</kbd><span>PAUSE</span></div></div><div class="mobile-game-controls"><div class="touch-joystick" id="move-joystick" aria-label="Move astronaut"><span class="joystick-ring"></span><span class="joystick-knob" id="move-knob"></span></div><div class="touch-actions"><button data-action="mobile-interact">INTERACT</button><button data-action="mobile-jump" class="jump-action" ${vehicleMode ? 'hidden' : ''}>JUMP</button><button data-action="exit-vehicle" class="vehicle-exit" ${vehicleMode ? '' : 'hidden'}>EXIT ROVER</button><button data-action="scan-sample">SCAN</button></div></div>${stationModal ? renderStationModal(stationModal) : ''}${vehicleMode ? `<div class="vehicle-banner"><span>ROVER CONTROL ACTIVE</span><button data-action="exit-vehicle">EXIT VEHICLE ×</button><small>WASD / virtual joystick · Drive to the turquoise beacon to scan</small></div>` : ''}${worldLoading ? `<div class="loading-chip">INITIALISING PLANETARY WORLD…</div>` : ''}${worldError ? `<div class="fallback-chip">3D fallback active · ${esc(worldError)}</div>` : ''}<div class="game-world-controls"><button data-action="open-assistant">MISSION CONTROL AI</button><button data-action="save-game">SAVE PROGRESS</button></div><div id="assistant-box" class="assistant-box" hidden><div><strong>MISSION CONTROL</strong><button data-action="close-assistant">×</button></div><p id="assistant-answer">Ask about your current task, oxygen, power, water or crew safety.</p><form id="assistant-form"><input name="question" placeholder="Ask Mission Control…" required><button>ASK</button></form></div></section>`;
+  return `<section class="game-view">${renderDemoPanel()}<div class="game-scene-label"><span class="scene-pulse"></span> THIRD-PERSON EXPLORATION <i></i><b>${selectedPlanet.toUpperCase()} SURFACE</b></div><div class="game-left-hud"><div class="game-day-pill">MISSION DAY <strong>${currentDay()} / 07</strong></div>${renderObjectiveCard()}<div class="game-resource-stack">${resources.map((r) => `<div class="game-resource"><span class="resource-icon">${r.id === 'oxygen' ? 'O₂' : r.id === 'power' ? 'ϟ' : r.id === 'water' ? 'H₂O' : '✿'}</span><div><div class="resource-meter-label"><span>${r.label}</span><strong>${Math.round(r.value)}%</strong></div><div class="resource-track"><i class="${r.value < 24 ? 'critical' : r.value < 48 ? 'caution' : 'healthy'}" style="width:${clamp(r.value)}%"></i></div></div></div>`).join('')}</div></div><div class="game-right-hud"><button data-action="camera" data-value="overview">◎ OVERVIEW</button><button data-action="camera" data-value="habitat">⌂ HABITAT</button><button data-action="camera" data-value="horizon">◇ HORIZON</button><button data-action="pause-game">Ⅱ PAUSE</button></div><div class="game-bottom-hud"><div id="interaction-hint" class="interaction-hint"><span class="keycap">E</span><div><strong>Explore the outpost</strong><small>Walk towards a glowing station to interact</small></div></div><div class="movement-legend"><kbd>W A S D</kbd><span>MOVE</span><kbd>SHIFT</kbd><span>RUN</span><kbd>SPACE</kbd><span>JUMP</span><kbd>E</kbd><span>INTERACT</span><kbd>ESC</kbd><span>PAUSE</span></div></div><div class="mobile-game-controls"><div class="touch-joystick" id="move-joystick" aria-label="Move astronaut"><span class="joystick-ring"></span><span class="joystick-knob" id="move-knob"></span></div><div class="touch-actions"><button data-action="mobile-interact">INTERACT</button><button data-action="mobile-jump" class="jump-action" ${vehicleMode ? 'hidden' : ''}>JUMP</button><button data-action="exit-vehicle" class="vehicle-exit" ${vehicleMode ? '' : 'hidden'}>EXIT ROVER</button><button data-action="scan-sample">SCAN</button></div></div>${stationModal ? renderStationModal(stationModal) : ''}${vehicleMode ? `<div class="vehicle-banner"><span>ROVER CONTROL ACTIVE</span><button data-action="exit-vehicle">EXIT VEHICLE ×</button><small>WASD / virtual joystick · Drive to the turquoise beacon to scan</small></div>` : ''}${worldLoading ? `<div class="loading-chip">INITIALISING PLANETARY WORLD…</div>` : ''}${worldError ? `<div class="fallback-chip">3D fallback active · ${esc(worldError)}</div>` : ''}<div class="game-world-controls"><button data-action="open-assistant">MISSION CONTROL AI</button><button data-action="save-game">SAVE PROGRESS</button></div><div id="assistant-box" class="assistant-box" hidden><div><strong>MISSION CONTROL</strong><button data-action="close-assistant">×</button></div><p id="assistant-answer">Ask about your current task, oxygen, power, water or crew safety.</p><form id="assistant-form"><input name="question" placeholder="Ask Mission Control…" required><button>ASK</button></form></div></section>`;
 }
 
 function renderStationModal(id: StationId): string {
@@ -383,9 +495,21 @@ function renderSettings(): string {
 }
 
 function renderAccount(): string {
-  return `<section class="account-screen"><div class="account-card"><button class="modal-close" data-action="account-close">×</button><span class="eyebrow-pill">PLAYER IDENTITY</span><h1>${account ? 'Commander profile' : 'Join the crew.'}</h1><p>${account ? `Signed in as ${esc(account.email)}.` : 'Create a commander profile to save your journey across devices. You can also continue as a guest.'}</p>${account ? `<div class="profile-summary"><span>${esc(account.avatar)}</span><div><strong>${esc(account.name)}</strong><small>${esc(account.email)}</small></div></div><div class="avatar-pickers"><span>COMMANDER MARK</span>${['AL','IM','SH','JF','86'].map((v) => `<button data-action="set-avatar" data-value="${v}" class="${account?.avatar === v ? 'selected' : ''}">${v}</button>`).join('')}</div><button class="primary-button" data-action="sync-save">Sync mission progress ↗</button><button class="secondary-button" data-action="logout">Sign out</button>` : `<div class="auth-tabs"><button class="${authMode === 'login' ? 'active' : ''}" data-action="auth-mode" data-value="login">Sign in</button><button class="${authMode === 'register' ? 'active' : ''}" data-action="auth-mode" data-value="register">Create account</button></div><form id="account-form" class="auth-form">${authMode === 'register' ? `<label>Commander name<input name="name" minlength="2" maxlength="40" placeholder="Your commander name" required></label>` : ''}<label>Email address<input name="email" type="email" autocomplete="email" placeholder="commander@example.com" required></label><label>Password<input name="password" type="password" minlength="10" autocomplete="${authMode === 'register' ? 'new-password' : 'current-password'}" placeholder="At least 10 characters" required></label><button class="primary-button" type="submit" ${accountBusy ? 'disabled' : ''}>${authMode === 'register' ? 'Create commander account' : 'Sign in'} <b>→</b></button></form><button class="quiet-button" data-action="account-close">Continue as guest</button><small class="auth-note">Accounts require the Cloudflare API to be deployed and configured. Guest mode remains available.</small>`}</div></section>`;
+  const googleArea = isGoogleSignInConfigured()
+    ? '<div id="google-signin-button" class="google-signin-button" aria-label="Continue with Google"></div>'
+    : '<button class="secondary-button google-auth-disabled" type="button" disabled aria-disabled="true"><span aria-hidden="true">G</span> Continue with Google</button><small class="auth-note">Google sign-in is not activated yet. Enable Google in Firebase Authentication and add its OAuth Web Client ID to the build configuration.</small>';
+  let content = '';
+  if (account) {
+    content = `<h1>Commander profile</h1><p>Signed in as ${esc(account.email)}.</p><div class="profile-summary"><span>${esc(account.avatar)}</span><div><strong>${esc(account.name)}</strong><small>${esc(account.email)}</small></div></div><div class="avatar-pickers"><span>COMMANDER MARK</span>${['AL','IM','SH','JF','86'].map((v) => `<button data-action="set-avatar" data-value="${v}" class="${account?.avatar === v ? 'selected' : ''}">${v}</button>`).join('')}</div><button class="primary-button" data-action="sync-save">Sync mission progress ↗</button><button class="secondary-button" data-action="logout">Sign out</button>`;
+  } else if (verificationPendingEmail) {
+    content = `<span class="eyebrow-pill">EMAIL VERIFICATION</span><h1>Check your inbox.</h1><p>We sent a verification link to <strong>${esc(verificationPendingEmail)}</strong>. Open that email, follow the link, then return here.</p><div class="verification-callout"><strong>Your account is not active in the game yet.</strong><span>We will only connect your commander profile after Firebase confirms that this email is verified.</span></div><button class="primary-button" data-action="verify-check" ${accountBusy ? 'disabled' : ''}>I've verified my email <b>→</b></button><button class="secondary-button" data-action="verify-resend" ${accountBusy ? 'disabled' : ''}>Resend verification email</button><button class="quiet-button" data-action="verification-back">Back to sign in</button>`;
+  } else if (authMode === 'reset') {
+    content = `<h1>Reset your password.</h1><p>Enter the email address linked to your commander account. Firebase will send a reset link if an account is registered.</p><form id="account-reset-form" class="auth-form"><label>Email address<input name="email" type="email" autocomplete="email" placeholder="commander@example.com" required></label><button class="primary-button" type="submit" ${accountBusy ? 'disabled' : ''}>Send password reset link <b>→</b></button></form><button class="quiet-button" data-action="auth-mode" data-value="login">Back to sign in</button>`;
+  } else {
+    content = `<span class="eyebrow-pill">PLAYER IDENTITY</span><h1>Join the crew.</h1><p>Create a commander account to keep your mission progress with you across devices. You can still continue as a guest.</p><div class="auth-tabs"><button class="${authMode === 'login' ? 'active' : ''}" data-action="auth-mode" data-value="login">Sign in</button><button class="${authMode === 'register' ? 'active' : ''}" data-action="auth-mode" data-value="register">Create account</button></div><form id="account-form" class="auth-form">${authMode === 'register' ? `<label>Commander name<input name="name" minlength="2" maxlength="40" autocomplete="name" placeholder="Your commander name" required></label>` : ''}<label>Email address<input name="email" type="email" autocomplete="email" placeholder="commander@example.com" required></label><label>Password<input name="password" type="password" minlength="10" maxlength="128" autocomplete="${authMode === 'register' ? 'new-password' : 'current-password'}" placeholder="At least 10 characters" required></label><button class="primary-button" type="submit" ${accountBusy ? 'disabled' : ''}>${authMode === 'register' ? 'Create commander account' : 'Sign in'} <b>→</b></button></form>${authMode === 'login' ? '<button class="text-button forgot-password" data-action="auth-mode" data-value="reset">Forgot password?</button><small class="auth-note legacy-link-note">Had an account in an earlier release? Choose Create account with the same verified email to link your existing commander saves.</small>' : ''}<div class="auth-divider"><span>OR</span></div>${googleArea}<button class="quiet-button" data-action="account-close">Continue as guest</button><small class="auth-note">Protected by Firebase Authentication. Your game save is stored by the KSA OUTPOST 86 Cloudflare service. Guest progress stays on this device.</small>`;
+  }
+  return `<section class="account-screen"><div class="account-card"><button class="modal-close" data-action="account-close" aria-label="Close account panel">×</button>${content}</div></section>`;
 }
-
 function renderLander(): string {
   return `<section class="page-shell lander-page"><div class="page-heading"><div><span class="eyebrow-pill">ASTRONAUT TRAINING LAB</span><h1>Lunar <em>landing.</em></h1><p>Control descent speed and lateral drift. Touch down gently inside the target zone.</p></div><button class="secondary-button" data-action="navigate" data-view="home">← Back home</button></div><div class="lander-game"><div class="lander-scene"><div class="lander-moon"></div><div class="lander-craft" style="--lander-y:${Math.max(4,80-lander.altitude/2.3)}%;--lander-x:${50+lander.horizontalPosition*.32}%">◈</div><div class="lander-target"></div></div><div class="lander-panel"><div class="lander-stats"><span>ALTITUDE <b>${lander.altitude.toFixed(1)} m</b></span><span>VERTICAL SPEED <b>${lander.verticalVelocity.toFixed(1)} m/s</b></span><span>FUEL <b>${Math.round(lander.fuel)}%</b></span></div><label>ENGINE THROTTLE <input id="lander-throttle" type="range" min="0" max="100" value="${landerControls.throttle*100}"></label><label>LATERAL CONTROL <input id="lander-lateral" type="range" min="-100" max="100" value="${landerControls.lateral*100}"></label><button class="primary-button" data-action="lander-start">${lander.phase === 'flight' ? 'DESCENT IN PROGRESS' : lander.phase === 'landed' ? 'LANDED SUCCESSFULLY' : lander.phase === 'crashed' ? 'RESET & RETRY' : 'START DESCENT'} <b>→</b></button><button class="secondary-button" data-action="lander-reset">Reset simulation</button><p class="training-note-small">Simplified educational landing exercise. Not a real flight-dynamics model.</p></div></div></section>`;
 }
@@ -416,6 +540,10 @@ function render(): void {
   const page = view === 'onboarding' ? `${header()}<main class="app-main onboarding-main">${renderOnboarding()}</main><div id="toast-host" aria-live="polite"></div>` : commonMain(renderView());
   const loadingBadge = worldLoading ? `<div class="world-loading-badge" role="status"><span class="loading-orbit"></span><span><strong>Preparing your universe</strong><small>Loading the first planetary scene…</small></span></div>` : '';
   root!.innerHTML = page + loadingBadge;
+  if (view === 'account' && !account && !verificationPendingEmail && authMode !== 'reset' && isGoogleSignInConfigured()) {
+    const googleButton = document.querySelector<HTMLElement>('#google-signin-button');
+    if (googleButton) void mountGoogleSignInButton(googleButton, handleGoogleCredential).catch((error: unknown) => toastMessage('Google sign-in unavailable', error instanceof Error ? error.message : 'Google could not be loaded.', 'warning'));
+  }
   renderToast();
   if (view === 'game' || view === 'onboarding' && onboardingStep === 3) refreshInteractionHint();
   world?.setPaused(!['home', 'universe', 'rocket', 'worlds', 'game', 'onboarding'].includes(view));
@@ -467,30 +595,98 @@ function openRocketWorkshop(destination = selectedPlanet): void {
   else if (destination === 'moon') { mission = loadMission() ?? createInitialMission(); saveMission(mission); }
   rocketLaunchBusy = false; rocketCountdown = 0;
   if (rocketCountdownTimer) window.clearInterval(rocketCountdownTimer);
+  if (rocketLaunchWatchdog) window.clearTimeout(rocketLaunchWatchdog);
+  rocketCountdownTimer = 0; rocketLaunchWatchdog = 0;
   setView('rocket');
 }
 function startAdventure(destination = selectedPlanet): void { openRocketWorkshop(destination); }
 function launchConfiguredRocket(): void {
   const stats = rocketStats();
   if (!stats.readiness) { toastMessage('Flight check failed', stats.notes[0] ?? 'Install the required rocket components.', 'warning'); return; }
-  if (!world) { toastMessage('3D engine is still loading', 'Please try launch again in a moment.', 'warning'); return; }
+  if (!world) { toastMessage('3D engine is still loading', 'The flight sequence will become available as soon as the world is ready.', 'warning'); return; }
   if (rocketLaunchBusy) return;
-  rocketLaunchBusy = true; rocketCountdown = 3; render();
-  toastMessage('Launch sequence started', 'Crew strapped in. Propulsion and communications checks are green.', 'success');
+  rocketLaunchBusy = true;
+  rocketCountdown = 3;
+  flightStatusText = 'Crew manifest verified · propulsion checks beginning';
+  let arrivalHandled = false;
+  const clearLaunchTimers = (): void => {
+    if (rocketCountdownTimer) window.clearInterval(rocketCountdownTimer);
+    if (rocketLaunchWatchdog) window.clearTimeout(rocketLaunchWatchdog);
+    rocketCountdownTimer = 0;
+    rocketLaunchWatchdog = 0;
+  };
+  const arrive = (recovered = false): void => {
+    if (arrivalHandled) return;
+    arrivalHandled = true;
+    clearLaunchTimers();
+    rocketLaunchBusy = false;
+    rocketCountdown = 0;
+    flightStatusText = 'Touchdown confirmed';
+    persistPlanet();
+    view = 'game';
+    try { world?.setPaused(false); world?.setPlayerControlled(true); world?.setVehicleMode(false); } catch { /* the log and UI still recover if the renderer has already been disposed */ }
+    vehicleMode = false;
+    recordMissionLog(recovered ? 'Flight transfer recovered' : 'Planetary touchdown', recovered
+      ? `The transfer animation did not finish on time. Mission Control safely restored the ${selectedPlanet.toUpperCase()} surface scene without reloading the application.`
+      : `The Expedition MK-I completed its educational transfer to ${selectedPlanet.toUpperCase()}.`);
+    render();
+    toastMessage(recovered ? 'Surface restored safely' : 'Touchdown confirmed', `Welcome to ${selectedPlanet.toUpperCase()}, Commander. Your mission is ready; no page reload is required.`, recovered ? 'warning' : 'success');
+    startHudLoop();
+    if (demoPendingLaunch) {
+      demoPendingLaunch = false;
+      startFiveMinuteDemo();
+    }
+  };
+  const failCleanly = (message: string): void => {
+    if (arrivalHandled) return;
+    clearLaunchTimers();
+    rocketLaunchBusy = false;
+    rocketCountdown = 0;
+    flightStatusText = message;
+    render();
+    toastMessage('Launch could not start', `${message}. Your rocket configuration is saved. You can try again without refreshing the page.`, 'warning');
+  };
+  rocketLaunchWatchdog = window.setTimeout(() => {
+    if (arrivalHandled) return;
+    flightStatusText = 'Restoring destination scene';
+    // This is an in-app recovery path. It never asks the player to refresh.
+    try { world?.setPlanet(selectedPlanet); } catch { /* UI recovery is still possible without the renderer */ }
+    arrive(true);
+  }, 25000);
+  render();
+  recordMissionLog('Rocket launch sequence started', `Mission Control began the Expedition MK-I launch sequence for ${selectedPlanet.toUpperCase()}.`);
+  toastMessage('Launch sequence started', 'Crew secured. Mission Control is checking propulsion, fuel and navigation.', 'success');
   rocketCountdownTimer = window.setInterval(() => {
     rocketCountdown -= 1;
-    if (rocketCountdown > 0) { render(); return; }
-    window.clearInterval(rocketCountdownTimer); rocketCountdownTimer = 0;
-    rocketCountdown = 0; render();
-    world?.launchRocket(selectedPlanet, () => {
-      world?.playJourney(selectedPlanet, () => {
-        rocketLaunchBusy = false;
-        persistPlanet();
-        view = 'game'; world?.setPlayerControlled(true); world?.setPaused(false); render();
-        toastMessage('Touchdown confirmed', `Welcome to ${selectedPlanet.toUpperCase()}, Commander. Move towards the glowing station and press E or tap INTERACT.`, 'success');
-        startHudLoop();
-      });
-    });
+    if (rocketCountdown > 0) {
+      flightStatusText = rocketCountdown === 2 ? 'Propulsion and fuel pressure verified' : 'Navigation and communications link verified';
+      render();
+      return;
+    }
+    if (rocketCountdownTimer) window.clearInterval(rocketCountdownTimer);
+    rocketCountdownTimer = 0;
+    flightStatusText = 'IGNITION · main engine start';
+    render();
+    const beginJourney = (): void => {
+      if (arrivalHandled) return;
+      flightStatusText = `Transfer burn · travelling to ${selectedPlanet.toUpperCase()}`;
+      render();
+      let journeyStarted = false;
+      try { journeyStarted = world?.playJourney(selectedPlanet, () => arrive(false)) ?? false; } catch { journeyStarted = false; }
+      if (!journeyStarted) {
+        flightStatusText = 'Transfer unavailable · restoring planetary surface';
+        try { world?.setPlanet(selectedPlanet); } catch { /* finish the UI recovery even if the renderer has failed */ }
+        arrive(true);
+      }
+    };
+    let started = false;
+    try { started = world?.launchRocket(selectedPlanet, beginJourney) ?? false; } catch { started = false; }
+    if (!started) {
+      flightStatusText = 'Rebuilding flight scene · retrying automatically';
+      try { world?.setSceneMode('rocket'); started = world?.launchRocket(selectedPlanet, beginJourney) ?? false; } catch { started = false; }
+    }
+    if (!started) failCleanly('Flight systems could not initialise');
+    else { flightStatusText = 'Main engine firing · spacecraft ascending'; render(); }
   }, 1000);
 }
 function openStation(id: StationId): void {
@@ -508,7 +704,10 @@ function applyAction(action: string): void {
     const result = applyMarsAction(mars, action as FrontierAction);
     if (!result.ok) { toastMessage(result.title, result.message, 'warning'); return; }
     mars = result.state; saveMarsMission(mars);
-    if (action === 'deploy-rover') world?.deployRover();
+    if (action === 'inspect-systems') markDemoTask('systems');
+    if (action === 'power-balanced' || action === 'power-conserve') markDemoTask('power');
+    if (action === 'deploy-rover') { world?.deployRover(); markDemoTask('rover'); }
+    if (action === 'collect-sample') markDemoTask('sample');
     const earned = action === 'collect-sample'
       ? unlockBadge('mars-field-scientist', 'Mars Field Scientist', 100)
       : action === 'final-assessment' ? unlockBadge('mars-expedition-complete', 'Mars Expedition Complete', 150) : false;
@@ -557,7 +756,7 @@ function enterRover(): void {
   if (selectedPlanet === 'mars' && !mars.roverDeployed) {
     const result = applyMarsAction(mars, 'deploy-rover');
     if (!result.ok) { toastMessage(result.title, result.message, 'warning'); return; }
-    mars = result.state; saveMarsMission(mars); world?.deployRover();
+    mars = result.state; saveMarsMission(mars); world?.deployRover(); markDemoTask('rover');
     toastMessage('Rover deployed', 'The rover is powered and ready. Use W A S D to drive the ridge route.', 'success');
   } else if (selectedPlanet === 'moon') world?.deployRover();
   vehicleMode = true; stationModal = null; world?.setVehicleMode(true); render();
@@ -620,6 +819,32 @@ async function enableBrowserAlerts(): Promise<void> {
   try { localStorage.setItem('ksa-outpost-86-browser-alerts-v1', String(browserAlertsEnabled)); } catch { /* preference remains for this session */ }
   toastMessage(browserAlertsEnabled ? 'Mission alerts enabled' : 'Mission alerts not enabled', browserAlertsEnabled ? 'Important mission events can appear while this tab is in the background.' : 'Allow notifications in your browser settings to receive background-tab alerts.', browserAlertsEnabled ? 'success' : 'warning');
 }
+async function finishFirebaseSignIn(tokens: FirebaseTokens, firebaseUser: Awaited<ReturnType<typeof lookupFirebaseUser>>): Promise<void> {
+  if (firebaseUser.disabled) throw new Error('This Firebase account has been disabled. Contact the project administrator.');
+  if (!firebaseUser.emailVerified) {
+    verificationPendingEmail = firebaseUser.email;
+    view = 'account';
+    render();
+    toastMessage('Verify your email first', 'Your Firebase account exists, but it is not connected to the game until email verification succeeds.', 'warning');
+    return;
+  }
+  const response = await apiRequest('/api/auth/firebase/session', {
+    method: 'POST',
+    body: JSON.stringify({ idToken: tokens.idToken }),
+  });
+  const result = await response.json() as { user?: PlayerProfile; error?: string };
+  if (!response.ok || !result.user) throw new Error(result.error || 'The secure game session could not be created.');
+  verificationPendingEmail = null;
+  adoptAccountProfile(result.user);
+  await restorePlayerSave();
+  await restorePlayerEvents();
+  openRealtime();
+  await syncPlayerSave();
+  view = 'home';
+  render();
+  toastMessage('Commander profile ready', `Welcome, ${result.user.name}. Firebase has verified your identity and your game profile is connected.`, 'success');
+}
+
 async function checkServer(): Promise<void> {
   try {
     const response = await apiRequest('/api/health', { method: 'GET', headers: {} });
@@ -633,35 +858,98 @@ async function checkServer(): Promise<void> {
           if (payload.user.onboardingComplete && view === 'onboarding' && localStorage.getItem(ONBOARDING_KEY) === 'complete') view = 'home';
           void restorePlayerSave(); void restorePlayerEvents(); openRealtime();
         }
+      } else {
+        // The Cloudflare game session can expire while Firebase's refresh token
+        // remains valid. Re-establish the game session only after Firebase
+        // confirms the account and its verified email.
+        const restored = await refreshStoredFirebaseSession();
+        if (restored?.user.emailVerified) {
+          await finishFirebaseSignIn(restored.tokens, restored.user);
+        } else if (restored && !restored.user.emailVerified) {
+          verificationPendingEmail = restored.user.email;
+          view = 'account';
+        }
       }
     }
   } catch { serverStatus = 'unavailable'; }
   if (view === 'settings' || view === 'account') render();
 }
+
 async function signInOrRegister(form: HTMLFormElement): Promise<void> {
   const data = new FormData(form);
-  const payload: Record<string, string> = {
-    email: String(data.get('email') ?? '').trim(),
-    password: String(data.get('password') ?? ''),
-  };
-  if (authMode === 'register') payload.name = String(data.get('name') ?? '').trim();
+  const email = String(data.get('email') ?? '').trim();
+  const password = String(data.get('password') ?? '');
   accountBusy = true; render();
   try {
-    const response = await apiRequest(`/api/auth/${authMode === 'register' ? 'register' : 'login'}`, { method: 'POST', body: JSON.stringify(payload) });
-    const result = await response.json() as { user?: PlayerProfile; error?: string };
-    if (!response.ok || !result.user) throw new Error(result.error || 'Account service is not available.');
-    adoptAccountProfile(result.user);
-    // Restore any existing server profile before uploading this device's state;
-    // otherwise a fresh browser could overwrite an established commander save.
-    await restorePlayerSave();
-    await restorePlayerEvents();
-    openRealtime();
-    await syncPlayerSave();
-    view = 'home'; render(); toastMessage('Commander profile ready', `Welcome, ${result.user.name}. Your account is connected.`, 'success');
+    if (authMode === 'register') {
+      const name = String(data.get('name') ?? '').trim();
+      await createFirebaseAccount(email, password, name);
+      verificationPendingEmail = email;
+      view = 'account';
+      render();
+      toastMessage('Verification email sent', `Firebase created your account and sent a verification link to ${email}. Verify it before signing in.`, 'success');
+      return;
+    }
+    const tokens = await signInFirebaseWithPassword(email, password);
+    const firebaseUser = await lookupFirebaseUser(tokens.idToken);
+    await finishFirebaseSignIn(tokens, firebaseUser);
   } catch (error) {
-    toastMessage('Account unavailable', error instanceof Error ? error.message : 'The server could not complete sign-in. You can continue as a guest.', 'warning');
+    toastMessage('Account unavailable', error instanceof Error ? error.message : 'Firebase could not complete sign-in. You can continue as a guest.', 'warning');
     view = 'account'; render();
-  } finally { accountBusy = false; }
+  } finally { accountBusy = false; if (view === 'account') render(); }
+}
+
+async function handleGoogleCredential(googleIdToken: string): Promise<void> {
+  if (accountBusy) return;
+  accountBusy = true; render();
+  try {
+    const tokens = await exchangeGoogleCredential(googleIdToken);
+    const firebaseUser = await lookupFirebaseUser(tokens.idToken);
+    await finishFirebaseSignIn(tokens, firebaseUser);
+  } catch (error) {
+    toastMessage('Google sign-in unavailable', error instanceof Error ? error.message : 'Firebase could not complete Google sign-in.', 'warning');
+    view = 'account';
+  } finally { accountBusy = false; if (view === 'account') render(); }
+}
+
+async function checkPendingVerification(): Promise<void> {
+  if (accountBusy) return;
+  accountBusy = true; render();
+  try {
+    const restored = await refreshStoredFirebaseSession();
+    if (!restored) throw new Error('Your pending account session has expired. Sign in again.');
+    if (!restored.user.emailVerified) {
+      toastMessage('Email not verified yet', 'Open the latest Firebase verification email, then try again.', 'warning');
+      return;
+    }
+    await finishFirebaseSignIn(restored.tokens, restored.user);
+  } catch (error) {
+    toastMessage('Verification check failed', error instanceof Error ? error.message : 'Firebase could not confirm email verification.', 'warning');
+  } finally { accountBusy = false; if (view === 'account') render(); }
+}
+
+async function resendPendingVerification(): Promise<void> {
+  if (accountBusy) return;
+  accountBusy = true; render();
+  try {
+    await resendFirebaseVerification();
+    toastMessage('Verification email sent again', `Check the inbox for ${verificationPendingEmail || 'your account email'}.`, 'success');
+  } catch (error) {
+    toastMessage('Could not resend verification', error instanceof Error ? error.message : 'Firebase could not send the email.', 'warning');
+  } finally { accountBusy = false; if (view === 'account') render(); }
+}
+
+async function resetFirebasePassword(form: HTMLFormElement): Promise<void> {
+  const data = new FormData(form);
+  const email = String(data.get('email') ?? '').trim();
+  accountBusy = true; render();
+  try {
+    await sendFirebasePasswordReset(email);
+    toastMessage('Check your email', 'If a commander account exists for that address, Firebase has sent a password reset link.', 'success');
+    authMode = 'login';
+  } catch (error) {
+    toastMessage('Password reset unavailable', error instanceof Error ? error.message : 'Firebase could not send a reset email.', 'warning');
+  } finally { accountBusy = false; view = 'account'; render(); }
 }
 async function syncPlayerSave(): Promise<void> {
   if (!account) return;
@@ -717,6 +1005,9 @@ function openRealtime(): void {
 }
 function signOut(): void {
   void apiRequest('/api/auth/logout', { method: 'POST', body: '{}' }).catch(() => undefined);
+  void clearFirebaseRefreshToken();
+  verificationPendingEmail = null;
+  window.google?.accounts?.id?.disableAutoSelect();
   liveSocket?.close(); liveSocket = null; account = null;
   try { localStorage.removeItem('ksa-outpost-86-player-profile-v3'); } catch { /* optional */ }
   view = 'home'; render(); toastMessage('Signed out', 'Guest mode is ready on this device.', 'info');
@@ -758,7 +1049,7 @@ function handleClick(event: MouseEvent): void {
     case 'navigate': setView(target.dataset.view as View); break;
     case 'open-universe': setView('universe'); break;
     case 'open-rocket': openRocketWorkshop(); break;
-    case 'demo-mode': selectedPlanet = 'mars'; persistPlanet(); rocketConfig = buildStandardRocket(); saveRocketConfiguration(); openRocketWorkshop('mars'); toastMessage('Demo mission ready', 'Your standard rocket is assembled. Press LAUNCH EXPEDITION to begin the five-minute Mars adventure.', 'success'); break;
+    case 'demo-mode': demoPendingLaunch = true; demoSession = null; persistDemo(); selectedPlanet = 'mars'; persistPlanet(); rocketConfig = buildStandardRocket(); saveRocketConfiguration(); openRocketWorkshop('mars'); toastMessage('Demo flight ready', 'Your standard rocket is assembled. Launch to land on Mars; the five-minute timer starts after touchdown.', 'success'); break;
     case 'start-adventure': openRocketWorkshop(); break;
     case 'continue-adventure': setView('game'); break;
     case 'enter-game': setView('game'); break;
@@ -768,6 +1059,8 @@ function handleClick(event: MouseEvent): void {
     case 'rocket-part': { const key = value as keyof RocketConfiguration; if (key in rocketConfig) { rocketConfig = { ...rocketConfig, [key]: !rocketConfig[key] }; saveRocketConfiguration(); render(); } break; }
     case 'rocket-quick-build': rocketConfig = buildStandardRocket(); saveRocketConfiguration(); render(); toastMessage('Standard rocket assembled', 'Your Expedition MK-I is ready for final checks.', 'success'); break;
     case 'launch-rocket': launchConfiguredRocket(); break;
+    case 'end-demo': finishDemo('manual'); break;
+    case 'dismiss-demo': demoSession = null; persistDemo(); render(); break;
     case 'select-world': if (planets.includes(value as Planet)) { setPlanet(value as Planet); if (view === 'worlds') render(); } break;
     case 'onboard-next':
       if (onboardingStep === 1) { onboardingStep = 2; world?.setSceneMode('solar'); world?.focusCelestial('earth'); }
@@ -841,7 +1134,10 @@ function handleClick(event: MouseEvent): void {
     case 'open-guide': setView('explore'); break;
     case 'account': setView('account'); break;
     case 'account-close': view = 'settings'; render(); break;
-    case 'auth-mode': authMode = value === 'register' ? 'register' : 'login'; render(); break;
+    case 'auth-mode': authMode = value === 'register' || value === 'reset' ? value : 'login'; verificationPendingEmail = null; render(); break;
+    case 'verify-check': void checkPendingVerification(); break;
+    case 'verify-resend': void resendPendingVerification(); break;
+    case 'verification-back': verificationPendingEmail = null; authMode = 'login'; void clearFirebaseRefreshToken(); render(); break;
     case 'logout': signOut(); break;
     case 'sync-save': void syncPlayerSave(); break;
     case 'save-game': saveCurrentMission(); toastMessage('Mission saved', account ? 'Local progress saved. Cloud sync is requested.' : 'Your mission progress is saved on this device.', 'success'); break;
@@ -872,6 +1168,7 @@ window.addEventListener('keydown', (event) => {
 root.addEventListener('submit', (event) => {
   const form = event.target;
   if (form instanceof HTMLFormElement && form.id === 'account-form') { event.preventDefault(); void signInOrRegister(form); }
+  if (form instanceof HTMLFormElement && form.id === 'account-reset-form') { event.preventDefault(); void resetFirebasePassword(form); }
   if (form instanceof HTMLFormElement && form.id === 'assistant-form') {
     event.preventDefault(); const field = form.elements.namedItem('question');
     if (field instanceof HTMLInputElement) { askAssistant(field.value); field.value = ''; }
@@ -965,6 +1262,7 @@ window.addEventListener('keydown', (event) => {
 
 // Initial UI and 3D environment.
 render();
+resumeDemoClock();
 void checkServer();
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL, updateViaCache: 'none' })
